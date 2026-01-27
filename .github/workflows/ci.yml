@@ -28,25 +28,23 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
-        working-directory: seer_server
-        run: npm ci
-
-      - name: TypeScript type check
-        working-directory: seer_server
-        run: npm run build
-
-      - name: Build services
-        working-directory: seer_server
-        run: npm run build:services
-
-      - name: Check build output
         run: |
-          if (Test-Path "seer_server/release/services") {
-            Write-Host "✓ Build successful" -ForegroundColor Green
+          cd seer_server
+          npm ci
+
+      - name: TypeScript type check and build
+        run: |
+          cd seer_server
+          npm run build
+
+      - name: Verify build output
+        run: |
+          if (Test-Path "seer_server/dist") {
+            Write-Host "✓ TypeScript build successful" -ForegroundColor Green
             Write-Host "`nBuild artifacts:" -ForegroundColor Cyan
-            Get-ChildItem seer_server/release/services -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+            Get-ChildItem seer_server/dist -Recurse -File | Select-Object Name, Length | Format-Table -AutoSize
           } else {
-            Write-Host "✗ Build failed - release directory not found" -ForegroundColor Red
+            Write-Host "✗ Build failed - dist directory not found" -ForegroundColor Red
             exit 1
           }
         shell: pwsh
@@ -55,6 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: seer-server-ci-build
-          path: seer_server/release/services/
+          path: seer_server/dist/
           retention-days: 7
+
 
