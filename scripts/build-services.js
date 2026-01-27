@@ -26,22 +26,51 @@ if (!fs.existsSync(servicesDir)) {
 
 console.log('========== 开始打包独立服务 ==========\n');
 
+// 检测平台
+const isWindows = process.platform === 'win32';
+const isLinux = process.platform === 'linux';
+const isMac = process.platform === 'darwin';
+
+let target = 'node20-win-x64';
+let extension = '.exe';
+
+if (isLinux) {
+  target = 'node20-linux-x64';
+  extension = '';
+} else if (isMac) {
+  target = 'node20-macos-x64';
+  extension = '';
+}
+
+console.log(`检测到平台: ${process.platform}`);
+console.log(`使用目标: ${target}\n`);
+
 // 打包每个服务
 for (const service of services) {
   console.log(`[${service.name}] 正在打包...`);
   
-  const outputPath = path.join(servicesDir, service.output);
+  const outputPath = path.join(servicesDir, service.output + extension);
   
   try {
-    // 使用pkg打包
-    execSync(
-      `npx pkg ${service.entry} --targets node22-win-x64 --output ${outputPath}.exe --compress GZip`,
-      { stdio: 'inherit' }
-    );
+    // 使用pkg打包，添加超时和重试配置
+    const pkgCommand = `npx pkg ${service.entry} --targets ${target} --output "${outputPath}" --compress GZip`;
     
-    console.log(`[${service.name}] ✓ 打包完成: ${outputPath}.exe\n`);
+    console.log(`  执行命令: ${pkgCommand}`);
+    
+    execSync(pkgCommand, { 
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        PKG_CACHE_PATH: path.join(__dirname, '../.pkg-cache'),
+        NODE_OPTIONS: '--max-old-space-size=4096'
+      },
+      timeout: 300000 // 5分钟超时
+    });
+    
+    console.log(`[${service.name}] ✓ 打包完成: ${outputPath}\n`);
   } catch (error) {
     console.error(`[${service.name}] ✗ 打包失败:`, error.message);
+    console.error('提示: 如果是网络问题，请稍后重试或手动下载 pkg 缓存');
     process.exit(1);
   }
 }
@@ -126,28 +155,35 @@ const readme = `# KOSE Server - 独立服务
 
 ## 服务列表
 
-- \`gateway-server.exe\` - 网关服务（监听9999和27777端口）
-- \`game-server.exe\` - 游戏服务（RPC端口50002）
-- \`regist-server.exe\` - 注册服务（RPC端口50001）
-- \`email-server.exe\` - 邮件服务（RPC端口50003）
-- \`proxy-server.exe\` - 代理服务（调试用，监听9000端口）
+- \`gateway-server${extension}\` - 网关服务（监听9999和27777端口）
+- \`game-server${extension}\` - 游戏服务（RPC端口50002）
+- \`regist-server${extension}\` - 注册服务（RPC端口50001）
+- \`email-server${extension}\` - 邮件服务（RPC端口50003）
+- \`proxy-server${extension}\` - 代理服务（调试用，监听9000端口）
 
 ## 快速启动
 
 ### 方式一：一键启动所有服务（推荐）
 
-双击运行 \`start-all.bat\`，会自动按顺序启动所有必需的服务。
+${isWindows ? '双击运行 `start-all.bat`' : '运行 `./start-all.sh`'}，会自动按顺序启动所有必需的服务。
 
 ### 方式二：单独启动服务
 
+${isWindows ? `
 - \`start-gateway.bat\` - 启动网关服务
 - \`start-game.bat\` - 启动游戏服务
 - \`start-regist.bat\` - 启动注册服务
 - \`start-proxy.bat\` - 启动代理服务（调试用）
+` : `
+- \`./gateway-server\` - 启动网关服务
+- \`./game-server\` - 启动游戏服务
+- \`./regist-server\` - 启动注册服务
+- \`./proxy-server\` - 启动代理服务（调试用）
+`}
 
 ### 停止服务
 
-双击运行 \`stop-all.bat\` 停止所有正在运行的服务。
+${isWindows ? '双击运行 `stop-all.bat`' : '运行 `./stop-all.sh`'} 停止所有正在运行的服务。
 
 ## 启动方式
 
@@ -156,8 +192,7 @@ const readme = `# KOSE Server - 独立服务
 **方式一：使用一键启动脚本**
 
 \`\`\`bash
-# 双击运行
-start-all.bat
+${isWindows ? 'start-all.bat' : './start-all.sh'}
 \`\`\`
 
 **方式二：手动启动**
@@ -166,18 +201,17 @@ start-all.bat
 
 \`\`\`bash
 # 1. 启动后端服务
-start regist-server.exe
-start game-server.exe
+${isWindows ? 'start regist-server.exe' : './regist-server &'}
+${isWindows ? 'start game-server.exe' : './game-server &'}
 
 # 2. 启动网关
-start gateway-server.exe
+${isWindows ? 'start gateway-server.exe' : './gateway-server &'}
 \`\`\`
 
 ### 停止服务
 
 \`\`\`bash
-# 双击运行
-stop-all.bat
+${isWindows ? 'stop-all.bat' : './stop-all.sh'}
 \`\`\`
 
 ### 独立部署
@@ -186,17 +220,17 @@ stop-all.bat
 
 **机器1 - 网关服务器**
 \`\`\`bash
-gateway-server.exe
+${isWindows ? 'gateway-server.exe' : './gateway-server'}
 \`\`\`
 
 **机器2 - 游戏服务器**
 \`\`\`bash
-game-server.exe
+${isWindows ? 'game-server.exe' : './game-server'}
 \`\`\`
 
 **机器3 - 注册服务器**
 \`\`\`bash
-regist-server.exe
+${isWindows ? 'regist-server.exe' : './regist-server'}
 \`\`\`
 
 ## 配置
@@ -221,3 +255,6 @@ console.log('✓ README创建完成\n');
 
 console.log('========== 打包完成 ==========');
 console.log(`输出目录: ${servicesDir}`);
+console.log(`平台: ${process.platform}`);
+console.log(`目标: ${target}`);
+

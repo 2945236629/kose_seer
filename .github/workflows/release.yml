@@ -32,12 +32,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
         timeout-minutes: 15
+        env:
+          NPM_CONFIG_FETCH_RETRIES: 5
+          NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: 20000
+          NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 120000
 
       - name: Build TypeScript
         run: npm run build
 
+      - name: Cache pkg binaries
+        uses: actions/cache@v3
+        with:
+          path: .pkg-cache
+          key: pkg-cache-windows-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            pkg-cache-windows-
+
       - name: Build services
         run: npm run build:services
+        timeout-minutes: 30
+        env:
+          PKG_CACHE_PATH: .pkg-cache
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Copy config files
         run: |
@@ -88,12 +104,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
         timeout-minutes: 15
+        env:
+          NPM_CONFIG_FETCH_RETRIES: 5
+          NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: 20000
+          NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 120000
 
       - name: Build TypeScript
         run: npm run build
 
+      - name: Cache pkg binaries
+        uses: actions/cache@v3
+        with:
+          path: ~/.pkg-cache
+          key: pkg-cache-linux-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            pkg-cache-linux-
+
       - name: Build services
         run: npm run build:services
+        timeout-minutes: 30
+        env:
+          PKG_CACHE_PATH: ~/.pkg-cache
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Copy config files
         run: |
