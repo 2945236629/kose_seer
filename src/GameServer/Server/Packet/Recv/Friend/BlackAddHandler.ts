@@ -19,6 +19,6 @@ export class BlackAddHandler implements IHandler {
     req.deserialize(body);
 
     // 调用 FriendManager 处理
-    await player.FriendManager.AddToBlacklist(req.targetId);
+    await player.FriendManager.HandleAddToBlacklist(req.targetId);
   }
 }

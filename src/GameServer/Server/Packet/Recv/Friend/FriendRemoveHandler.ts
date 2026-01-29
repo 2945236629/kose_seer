@@ -19,6 +19,6 @@ export class FriendRemoveHandler implements IHandler {
     req.deserialize(body);
 
     // 调用 FriendManager 处理
-    await player.FriendManager.RemoveFriend(req.targetId);
+    await player.FriendManager.HandleRemoveFriend(req.targetId);
   }
 }

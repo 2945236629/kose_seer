@@ -19,6 +19,6 @@ export class BlackRemoveHandler implements IHandler {
     req.deserialize(body);
 
     // 调用 FriendManager 处理
-    await player.FriendManager.RemoveFromBlacklist(req.targetId);
+    await player.FriendManager.HandleRemoveFromBlacklist(req.targetId);
   }
 }

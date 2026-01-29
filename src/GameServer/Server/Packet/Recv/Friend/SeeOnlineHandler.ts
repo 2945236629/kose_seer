@@ -19,6 +19,6 @@ export class SeeOnlineHandler implements IHandler {
     req.deserialize(body);
 
     // 调用 FriendManager 处理
-    await player.FriendManager.SeeOnline();
+    await player.FriendManager.HandleSeeOnline();
   }
 }

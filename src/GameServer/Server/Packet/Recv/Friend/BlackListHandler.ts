@@ -14,6 +14,6 @@ export class BlackListHandler implements IHandler {
     if (!player) return;
 
     // 调用 FriendManager 处理
-    await player.FriendManager.GetBlacklist();
+    await player.FriendManager.HandleGetBlacklist();
   }
 }

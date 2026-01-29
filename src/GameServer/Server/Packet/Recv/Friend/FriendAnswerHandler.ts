@@ -20,9 +20,9 @@ export class FriendAnswerHandler implements IHandler {
 
     // 调用 FriendManager 处理
     if (req.accept) {
-      await player.FriendManager.ConfirmAddFriend(req.targetId);
+      await player.FriendManager.HandleConfirmAddFriend(req.targetId);
     } else {
-      player.FriendManager.RefuseAddFriend(req.targetId);
+      await player.FriendManager.HandleRefuseAddFriend(req.targetId);
     }
   }
 }
