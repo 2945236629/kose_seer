@@ -1,21 +1,13 @@
-import { BaseProto } from '../../../../../shared/proto/base/BaseProto';
-import { CommandID } from '../../../../../shared/protocol/CommandID';
 import { ItemBuyRspProto } from '../../../../../shared/proto/packets/rsp/item/ItemBuyRspProto';
 
 /**
- * 购买物品响应包
- * CMD 2601
+ * 物品购买/获得数据包
+ * CommandID: ITEM_BUY (2601)
+ * 
+ * 直接返回Proto对象，由SendPacket处理
  */
-export class PacketItemBuy extends BaseProto {
-  private _data: Buffer;
-
-  constructor(cash: number, itemId: number, itemNum: number, itemLevel: number = 0) {
-    super(CommandID.ITEM_BUY);
-    const proto = new ItemBuyRspProto(cash, itemId, itemNum, itemLevel);
-    this._data = proto.serialize();
-  }
-
-  public serialize(): Buffer {
-    return this._data;
+export class PacketItemBuy extends ItemBuyRspProto {
+  constructor(cash: number, itemID: number, itemNum: number, itemLevel: number) {
+    super(cash, itemID, itemNum, itemLevel);
   }
 }

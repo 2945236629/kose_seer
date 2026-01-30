@@ -15,7 +15,7 @@ import { IMigration } from '../IMigration';
  */
 export class Migration008AlignNoNoFieldsWithOfficial implements IMigration {
   name = '008_align_nono_fields_with_official';
-  version = 14;
+  version = 8;
 
   upMySQL(): string[] {
     return [

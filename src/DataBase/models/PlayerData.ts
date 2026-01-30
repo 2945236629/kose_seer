@@ -106,6 +106,7 @@ export class PlayerData implements IPlayerInfo {
 
   // ============ 战斗统计 ============
   monKingWin: number;
+  messWin: number;          // 混战胜利次数
   curStage: number;
   maxStage: number;
   curFreshStage: number;
@@ -235,6 +236,7 @@ export class PlayerData implements IPlayerInfo {
 
     // 战斗统计
     this.monKingWin = data.monKingWin;
+    this.messWin = data.messWin || 0;
     this.curStage = data.curStage;
     this.maxStage = data.maxStage;
     this.curFreshStage = data.curFreshStage;

@@ -123,7 +123,7 @@
           "dropItems": [
             {
               "itemId": 300001,
-              "dropRate": 0.1,
+              "dropRate": 0.9,
               "minCount": 1,
               "maxCount": 3
             }

@@ -333,6 +333,7 @@ export interface IPlayerInfo {
 
   // ============ 战斗统计 ============
   monKingWin: number;       // 怪物王胜利次数
+  messWin: number;          // 混战胜利次数
   curStage: number;         // 当前关卡
   maxStage: number;         // 最大关卡
   curFreshStage: number;    // 当前新手关卡
@@ -614,6 +615,7 @@ export function createDefaultPlayerInfo(userID: number, nick: string): IPlayerIn
     petMaxLev: 0,
     petAllNum: 0,
     monKingWin: 0,
+    messWin: 0,
     curStage: 1,
     maxStage: 0,
     curFreshStage: 0,

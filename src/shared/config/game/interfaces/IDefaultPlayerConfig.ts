@@ -30,6 +30,7 @@ export interface IDefaultPlayerData {
   petMaxLev: number;
   petAllNum: number;
   monKingWin: number;
+  messWin: number;
   curStage: number;
   maxStage: number;
   curFreshStage: number;

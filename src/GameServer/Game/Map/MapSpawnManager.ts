@@ -102,7 +102,7 @@ export class MapSpawnManager {
   public GetMapOgres(
     userId: number,
     mapId: number
-  ): Array<{ petId: number; shiny: number }> {
+  ): Array<{ petId: number; shiny: number; originalPetId: number }> {
     const playerState = this._playerStates.get(userId);
     
     // 如果没有状态或地图不匹配，生成新的
@@ -112,16 +112,17 @@ export class MapSpawnManager {
     }
 
     // 初始化9个空槽位
-    const result: Array<{ petId: number; shiny: number }> = Array(9)
+    const result: Array<{ petId: number; shiny: number; originalPetId: number }> = Array(9)
       .fill(null)
-      .map(() => ({ petId: 0, shiny: 0 }));
+      .map(() => ({ petId: 0, shiny: 0, originalPetId: 0 }));
 
     // 填充野怪到对应槽位
     for (const ogre of playerState.ogres) {
       if (ogre.isVisible && ogre.slot >= 0 && ogre.slot < 9) {
         result[ogre.slot] = {
           petId: ogre.petId,
-          shiny: ogre.shiny
+          shiny: ogre.shiny,
+          originalPetId: ogre.originalPetId
         };
       }
     }

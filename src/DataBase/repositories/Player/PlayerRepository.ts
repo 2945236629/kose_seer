@@ -38,6 +38,7 @@ interface IPlayerRow {
   pet_max_lev: number;
   pet_all_num: number;
   mon_king_win: number;
+  mess_win: number;
   cur_stage: number;
   max_stage: number;
   max_arena_wins: number;
@@ -115,13 +116,13 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
         energy, coins, fight_badge, allocatable_exp, map_id, pos_x, pos_y, time_today, time_limit,
         login_cnt, inviter, vip_level, vip_value, vip_stage, vip_end_time,
         teacher_id, student_id, graduation_count, pet_max_lev, pet_all_num,
-        mon_king_win, cur_stage, max_stage, max_arena_wins,
+        mon_king_win, mess_win, cur_stage, max_stage, max_arena_wins,
         has_nono, super_nono, nono_state, nono_color, nono_nick,
         nono_flag, nono_power, nono_mate, nono_iq, nono_ai,
         nono_birth, nono_charge_time,
         nono_super_energy, nono_super_level, nono_super_stage,
         badge, cur_title, team_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId, nick, now, 0, 0, 0, color, 0,  // vip=0(非VIP), viped=0(从未是VIP)
         defaultPlayer.energy, defaultPlayer.coins, defaultPlayer.fightBadge, defaultPlayer.allocatableExp,
@@ -131,7 +132,7 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
         defaultPlayer.vipLevel, defaultPlayer.vipValue, defaultPlayer.vipStage, defaultPlayer.vipEndTime,
         defaultPlayer.teacherId, defaultPlayer.studentId, defaultPlayer.graduationCount,
         defaultPlayer.petMaxLev, defaultPlayer.petAllNum,
-        defaultPlayer.monKingWin, defaultPlayer.curStage, defaultPlayer.maxStage, defaultPlayer.maxArenaWins,
+        defaultPlayer.monKingWin, defaultPlayer.messWin || 0, defaultPlayer.curStage, defaultPlayer.maxStage, defaultPlayer.maxArenaWins,
         defaultNoNo.hasNono, defaultNoNo.superNono, defaultNoNo.nonoState,
         defaultNoNo.nonoColor, defaultNoNo.nonoNick,
         defaultNoNo.nonoFlag, defaultNoNo.nonoPower, defaultNoNo.nonoMate,
@@ -617,6 +618,7 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
     player.petMaxLev = row.pet_max_lev;
     player.petAllNum = row.pet_all_num;
     player.monKingWin = row.mon_king_win;
+    player.messWin = row.mess_win || 0;
     player.curStage = row.cur_stage;
     player.maxStage = row.max_stage;
     player.maxArenaWins = row.max_arena_wins;

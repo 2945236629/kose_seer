@@ -15,9 +15,10 @@ import {
   PacketFightOver,
   PacketUsePetItem,
   PacketCatchMonster,
-  PacketEscapeFight
+  PacketEscapeFight,
+  PacketBattleReward
 } from '../../Server/Packet/Send/Battle';
-import { PacketMapBoss } from '../../Server/Packet/Send/Map';
+import { PacketMapBoss, PacketMapOgreList } from '../../Server/Packet/Send/Map';
 
 /**
  * 战斗管理器
@@ -41,6 +42,7 @@ export class BattleManager extends BaseManager {
   // 当前战斗的野怪槽位（用于战斗结束后刷新）
   private _currentBattleSlot: number = -1;
   private _currentBattleMapId: number = -1;
+  private _currentBattleOriginalPetId: number = -1; // 原始精灵ID（用于查找配置）
 
   constructor(player: PlayerInstance) {
     super(player);
@@ -113,6 +115,7 @@ export class BattleManager extends BaseManager {
       this._currentBattle = battle;
       this._currentBattleSlot = monsterIndex;
       this._currentBattleMapId = mapId;
+      this._currentBattleOriginalPetId = ogres[monsterIndex].originalPetId; // 保存原始精灵ID
 
       // 1. 先发送 2408 确认（空响应）
       await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_NPC_MONSTER));
@@ -258,10 +261,13 @@ export class BattleManager extends BaseManager {
 
   /**
    * 处理战斗结束
-   * 发送 FIGHT_OVER (2506)
+   * 发送 FIGHT_OVER (2506) + 物品奖励弹窗
    */
   private async HandleFightOver(winnerId: number, reason: number): Promise<void> {
     if (!this._currentBattle) return;
+
+    // 保存奖励信息（稍后发送）
+    let rewardItems: Array<{ itemId: number; itemCnt: number }> = [];
 
     // 如果玩家胜利，处理奖励
     if (winnerId === this.UserID) {
@@ -269,18 +275,39 @@ export class BattleManager extends BaseManager {
         this.UserID, 
         this._currentBattle,
         this._currentBattleMapId >= 0 ? this._currentBattleMapId : undefined,
-        this._currentBattleSlot >= 0 ? this._currentBattleSlot : undefined
+        this._currentBattleSlot >= 0 ? this._currentBattleSlot : undefined,
+        this._currentBattleOriginalPetId >= 0 ? this._currentBattleOriginalPetId : undefined
       );
-      Logger.Info(`[BattleManager] 战斗胜利奖励: Exp=${reward.expGained}, Coins=${reward.coinsGained}, LevelUp=${reward.levelUp}, Drops=${reward.droppedItems.length}`);
+      rewardItems = reward.rewardItems;
+      Logger.Info(`[BattleManager] 战斗胜利奖励: Exp=${reward.expGained}, Coins=${reward.coinsGained}, LevelUp=${reward.levelUp}, Drops=${reward.droppedItems.length}, RewardItems=${rewardItems.length}`);
     }
 
-    // 发送 FIGHT_OVER (2506)
-    await this.Player.SendPacket(new PacketFightOver(reason, winnerId));
+    // 获取玩家的各种次数信息
+    const playerData = this.Player.Data;
+    const twoTimes = playerData.twoTimes || 0;
+    const threeTimes = playerData.threeTimes || 0;
+    const autoFightTimes = playerData.autoFightTimes || 0;
+    const energyTimes = playerData.energyTimes || 0;
+    const learnTimes = playerData.learnTimes || 0;
 
-    // 战斗结束后移除野怪
+    // 发送 FIGHT_OVER (2506)
+    await this.Player.SendPacket(new PacketFightOver(
+      reason, 
+      winnerId,
+      twoTimes,
+      threeTimes,
+      autoFightTimes,
+      energyTimes,
+      learnTimes
+    ));
+
+    // 战斗结束后移除野怪并推送更新
     if (this._currentBattleSlot >= 0) {
       MapSpawnManager.Instance.OnBattleEnd(this.UserID, this._currentBattleSlot);
       Logger.Info(`[BattleManager] 战斗结束，移除野怪: userId=${this.UserID}, slot=${this._currentBattleSlot}`);
+      
+      // 推送野怪列表更新
+      await this.SendOgreListUpdate();
       
       // 如果是BOSS战斗，推送BOSS移除通知
       if (this._currentBattleMapId >= 0 && await this.IsBossBattle(this._currentBattleMapId, this._currentBattleSlot)) {
@@ -288,10 +315,22 @@ export class BattleManager extends BaseManager {
       }
     }
 
+    // 在所有战斗相关协议发送完毕后，延迟推送物品奖励弹窗
+    // 客户端在战斗结束后1秒才刷新地图，需要等待地图刷新完成后再发送物品通知
+    // 延迟1200ms确保客户端已完全退出战斗状态并刷新地图
+    if (rewardItems.length > 0) {
+      setTimeout(async () => {
+        // 发送物品奖励弹窗（客户端会显示 ItemInBagAlert）
+        await this.Player.SendPacket(new PacketBattleReward(rewardItems));
+        Logger.Info(`[BattleManager] 推送物品奖励弹窗: RewardItems=${rewardItems.length}`);
+      }, 1200);
+    }
+
     // 清理战斗实例
     this._currentBattle = null;
     this._currentBattleSlot = -1;
     this._currentBattleMapId = -1;
+    this._currentBattleOriginalPetId = -1;
 
     Logger.Info(`[BattleManager] 战斗结束: Winner=${winnerId}, Reason=${reason}`);
   }
@@ -315,6 +354,20 @@ export class BattleManager extends BaseManager {
     if (bossRemoval) {
       await this.Player.SendPacket(new PacketMapBoss([bossRemoval]));
       Logger.Info(`[BattleManager] 推送BOSS移除通知: region=${region}`);
+    }
+  }
+
+  /**
+   * 发送野怪列表更新
+   */
+  private async SendOgreListUpdate(): Promise<void> {
+    const mapId = this.Player.Data.mapID || 1;
+    const ogres = MapSpawnManager.Instance.GetMapOgres(this.UserID, mapId);
+    
+    // 只有当有野怪时才推送
+    if (ogres.length > 0) {
+      await this.Player.SendPacket(new PacketMapOgreList(ogres));
+      Logger.Info(`[BattleManager] 推送野怪列表更新: mapId=${mapId}, count=${ogres.length}`);
     }
   }
 
@@ -391,10 +444,13 @@ export class BattleManager extends BaseManager {
         const enemyId = this._currentBattle.enemy.id;
         await this.Player.SendPacket(new PacketCatchMonster(catchResult.catchTime, enemyId));
         
-        // 战斗结束后移除野怪
+        // 战斗结束后移除野怪并推送更新
         if (this._currentBattleSlot >= 0) {
           MapSpawnManager.Instance.OnBattleEnd(this.UserID, this._currentBattleSlot);
           Logger.Info(`[BattleManager] 捕获成功，移除野怪: userId=${this.UserID}, slot=${this._currentBattleSlot}`);
+          
+          // 推送野怪列表更新
+          await this.SendOgreListUpdate();
           
           // 如果是BOSS战斗，推送BOSS移除通知
           if (this._currentBattleMapId >= 0 && await this.IsBossBattle(this._currentBattleMapId, this._currentBattleSlot)) {
@@ -406,6 +462,7 @@ export class BattleManager extends BaseManager {
         this._currentBattle = null;
         this._currentBattleSlot = -1;
         this._currentBattleMapId = -1;
+        this._currentBattleOriginalPetId = -1;
         
         Logger.Info(
           `[BattleManager] 捕获成功: UserID=${this.UserID}, PetId=${enemyId}, ` +

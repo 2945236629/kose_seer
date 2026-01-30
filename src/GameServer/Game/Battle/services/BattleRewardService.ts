@@ -2,7 +2,6 @@ import { Logger } from '../../../../shared/utils';
 import { PlayerInstance } from '../../Player/PlayerInstance';
 import { IBattleInfo } from '../../../../shared/models/BattleModel';
 import { GameConfig } from '../../../../shared/config/game/GameConfig';
-import { IOgreDropItem } from '../../../../shared/config/game/interfaces/IMapOgreConfig';
 
 /**
  * 战斗奖励服务
@@ -21,18 +20,21 @@ export class BattleRewardService {
    * @param battle 战斗信息
    * @param mapId 地图ID（可选，用于读取配置）
    * @param slot 野怪槽位（可选，用于读取配置）
+   * @param originalPetId 原始精灵ID（可选，用于查找配置，闪光精灵需要用原始ID查找）
    */
   public async ProcessVictoryReward(
     userId: number, 
     battle: IBattleInfo,
     mapId?: number,
-    slot?: number
+    slot?: number,
+    originalPetId?: number
   ): Promise<{
     expGained: number;
     coinsGained: number;
     levelUp: boolean;
     newLevel: number;
     droppedItems: { itemId: number; count: number }[];
+    rewardItems: Array<{ itemId: number; itemCnt: number }>;  // 用于显示奖励弹窗
   }> {
     try {
       // 1. 计算经验奖励（从配置或默认计算）
@@ -50,20 +52,38 @@ export class BattleRewardService {
       // 4. 给玩家增加金币
       await this._player.AddCurrency(undefined, coinsGained);
 
-      // 5. 处理掉落物品
-      const droppedItems = this.ProcessDropItems(mapId, slot);
+      // 5. 处理掉落物品（使用originalPetId查找配置，如果没有则使用当前petId）
+      const droppedItems = this.ProcessDropItems(mapId, slot, originalPetId || battle.enemy.id);
       for (const drop of droppedItems) {
-        await this._player.ItemManager.ItemData.AddItem(drop.itemId, drop.count, 0);
-        Logger.Info(`[BattleRewardService] 掉落物品: ItemId=${drop.itemId}, Count=${drop.count}`);
+        this._player.ItemManager.ItemData.AddItem(drop.itemId, drop.count, 0);
+        Logger.Info(`[BattleRewardService] 掉落物品已添加到背包: ItemId=${drop.itemId}, Count=${drop.count}`);
       }
 
-      Logger.Info(`[BattleRewardService] 战斗奖励: UserID=${userId}, Exp=${expGained}, Coins=${coinsGained}, LevelUp=${levelUp}, Drops=${droppedItems.length}`);
+      // 6. 构建奖励列表（用于显示弹窗）
+      const rewardItems: Array<{ itemId: number; itemCnt: number }> = [];
+      
+      // 添加金币奖励（itemId=1表示赛尔豆）
+      if (coinsGained > 0) {
+        rewardItems.push({ itemId: 1, itemCnt: coinsGained });
+      }
+      
+      // 添加经验奖励（itemId=3表示积累经验）
+      if (expGained > 0) {
+        rewardItems.push({ itemId: 3, itemCnt: expGained });
+      }
+      
+      // 添加掉落物品
+      for (const drop of droppedItems) {
+        rewardItems.push({ itemId: drop.itemId, itemCnt: drop.count });
+      }
 
-      return { expGained, coinsGained, levelUp, newLevel, droppedItems };
+      Logger.Info(`[BattleRewardService] 战斗奖励: UserID=${userId}, Exp=${expGained}, Coins=${coinsGained}, LevelUp=${levelUp}, Drops=${droppedItems.length}, RewardItems=${rewardItems.length}`);
+
+      return { expGained, coinsGained, levelUp, newLevel, droppedItems, rewardItems };
 
     } catch (error) {
       Logger.Error(`[BattleRewardService] 处理奖励失败: ${error}`);
-      return { expGained: 0, coinsGained: 0, levelUp: false, newLevel: battle.player.level, droppedItems: [] };
+      return { expGained: 0, coinsGained: 0, levelUp: false, newLevel: battle.player.level, droppedItems: [], rewardItems: [] };
     }
   }
 
@@ -156,8 +176,9 @@ export class BattleRewardService {
   /**
    * 处理掉落物品
    */
-  private ProcessDropItems(mapId?: number, slot?: number): { itemId: number; count: number }[] {
-    if (mapId === undefined || slot === undefined) {
+  private ProcessDropItems(mapId?: number, slot?: number, petId?: number): { itemId: number; count: number }[] {
+    if (mapId === undefined || petId === undefined) {
+      Logger.Debug(`[BattleRewardService] 无法处理掉落: mapId=${mapId}, petId=${petId}`);
       return [];
     }
 
@@ -165,23 +186,46 @@ export class BattleRewardService {
 
     // 从配置读取掉落物品
     const mapConfig = GameConfig.GetMapOgreConfig();
-    if (!mapConfig) return droppedItems;
+    if (!mapConfig) {
+      Logger.Debug(`[BattleRewardService] 地图配置未加载`);
+      return droppedItems;
+    }
 
     const map = mapConfig.maps[mapId.toString()];
-    if (!map) return droppedItems;
+    if (!map) {
+      Logger.Debug(`[BattleRewardService] 地图${mapId}配置不存在`);
+      return droppedItems;
+    }
 
-    const ogre = map.ogres.find(o => o.slot === slot);
-    if (!ogre || !ogre.dropItems) return droppedItems;
+    // 使用petId查找配置（而不是slot，因为同一地图可能有多个不同精灵）
+    const ogre = map.ogres.find(o => o.petId === petId);
+    if (!ogre) {
+      Logger.Debug(`[BattleRewardService] 地图${mapId}精灵${petId}配置不存在`);
+      return droppedItems;
+    }
+    
+    if (!ogre.dropItems || ogre.dropItems.length === 0) {
+      Logger.Debug(`[BattleRewardService] 地图${mapId}精灵${petId}没有配置掉落物品`);
+      return droppedItems;
+    }
+
+    Logger.Debug(`[BattleRewardService] 处理掉落: mapId=${mapId}, petId=${petId}, slot=${slot}, dropConfigs=${ogre.dropItems.length}`);
 
     // 处理每个掉落物品
     for (const dropConfig of ogre.dropItems) {
+      const roll = Math.random();
+      Logger.Debug(`[BattleRewardService] 掉落判定: itemId=${dropConfig.itemId}, rate=${dropConfig.dropRate}, roll=${roll.toFixed(3)}`);
+      
       // 掉落概率判定
-      if (Math.random() <= dropConfig.dropRate) {
+      if (roll <= dropConfig.dropRate) {
         // 随机掉落数量
         const count = Math.floor(
           Math.random() * (dropConfig.maxCount - dropConfig.minCount + 1) + dropConfig.minCount
         );
         droppedItems.push({ itemId: dropConfig.itemId, count });
+        Logger.Info(`[BattleRewardService] 掉落成功: itemId=${dropConfig.itemId}, count=${count}`);
+      } else {
+        Logger.Debug(`[BattleRewardService] 掉落失败: itemId=${dropConfig.itemId}`);
       }
     }
 
@@ -217,6 +261,7 @@ export class BattleRewardService {
     const map = mapConfig.maps[mapId.toString()];
     if (!map) return null;
 
-    return map.ogres.find(o => o.slot === slot && o.petId === petId);
+    // 优先使用petId查找，如果找不到再用slot查找
+    return map.ogres.find(o => o.petId === petId) || map.ogres.find(o => o.slot === slot);
   }
 }

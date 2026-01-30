@@ -22,6 +22,7 @@
     "petMaxLev": 100,
     "petAllNum": 0,
     "monKingWin": 0,
+    "messWin": 0,
     "curStage": 0,
     "maxStage": 0,
     "curFreshStage": 0,

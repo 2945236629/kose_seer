@@ -2,35 +2,34 @@ import { BaseProto } from '../../../base/BaseProto';
 import { CommandID } from '../../../../protocol/CommandID';
 
 /**
- * 购买物品响应
- * CMD 2601
+ * 物品购买/获得响应协议
+ * CommandID: ITEM_BUY (2601)
+ * 
+ * 用途：
+ * 1. 购买物品后的响应
+ * 2. 战斗掉落物品的通知
+ * 3. 任务奖励物品的通知
  */
 export class ItemBuyRspProto extends BaseProto {
-  private cash: number;        // 剩余金币
-  private itemId: number;      // 物品ID
-  private itemNum: number;     // 购买数量
-  private itemLevel: number;   // 物品等级
+  public cash: number = 0;      // 当前金币
+  public itemID: number = 0;    // 物品ID
+  public itemNum: number = 0;   // 物品数量
+  public itemLevel: number = 0; // 物品等级
 
-  constructor(cash: number, itemId: number, itemNum: number, itemLevel: number = 0) {
+  constructor(cash: number = 0, itemID: number = 0, itemNum: number = 0, itemLevel: number = 0) {
     super(CommandID.ITEM_BUY);
     this.cash = cash;
-    this.itemId = itemId;
+    this.itemID = itemID;
     this.itemNum = itemNum;
     this.itemLevel = itemLevel;
   }
 
   public serialize(): Buffer {
     const buffer = Buffer.alloc(16);
-    let offset = 0;
-
-    buffer.writeUInt32BE(this.cash, offset);
-    offset += 4;
-    buffer.writeUInt32BE(this.itemId, offset);
-    offset += 4;
-    buffer.writeUInt32BE(this.itemNum, offset);
-    offset += 4;
-    buffer.writeUInt32BE(this.itemLevel, offset);
-
+    buffer.writeUInt32LE(this.cash, 0);
+    buffer.writeUInt32LE(this.itemID, 4);
+    buffer.writeUInt32LE(this.itemNum, 8);
+    buffer.writeUInt32LE(this.itemLevel, 12);
     return buffer;
   }
 }
