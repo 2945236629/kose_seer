@@ -404,7 +404,7 @@ export const CommandID = {
   // ============ 测试 ============
   TEST: 30000,
 
-  // ============ 尼尔号扩展 ============
+  // ============ 扩展 ============
   PET_GENE_RECAST: 70000,
   GET_EXCHANGE_INFO: 70001,
   EXCHANGE_ITEM: 70002,
@@ -418,7 +418,7 @@ export const CommandID = {
   ACHIEVE_CURRENT: 80005,
   ACHIEVEINFO: 80006,
   GET_CURRENT_GOLD_NIEOBEAN: 80007,
-  NIEO_HEART: 80008,
+  HEART: 80008,
 } as const;
 
 export type CommandIDType = typeof CommandID[keyof typeof CommandID];
