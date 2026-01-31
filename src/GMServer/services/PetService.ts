@@ -4,6 +4,9 @@ import { IPetInfo, createDefaultPetInfo } from '../../shared/models/PetModel';
 import { GameConfig } from '../../shared/config/game/GameConfig';
 import { PetCalculator } from '../../GameServer/Game/Pet/PetCalculator';
 import { SptSystem } from '../../GameServer/Game/Pet/SptSystem';
+import { OnlineTracker } from '../../GameServer/Game/Player/OnlineTracker';
+import { PlayerManager } from '../../GameServer/Game/Player/PlayerManager';
+import { PacketSystemMessage } from '../../GameServer/Server/Packet/Send/System/PacketSystemMessage';
 
 /**
  * 精灵管理服务
@@ -12,7 +15,28 @@ export class PetService {
   /**
    * 发送精灵（使用 GameServer 的实际实现）
    */
-  public async givePet(uid: number, petId: number, level: number, shiny: boolean): Promise<void> {
+  public async givePet(
+    uid: number, 
+    petId: number, 
+    level: number, 
+    shiny: boolean,
+    customStats?: {
+      dvHp?: number;
+      dvAtk?: number;
+      dvDef?: number;
+      dvSpAtk?: number;
+      dvSpDef?: number;
+      dvSpeed?: number;
+      evHp?: number;
+      evAtk?: number;
+      evDef?: number;
+      evSpAtk?: number;
+      evSpDef?: number;
+      evSpeed?: number;
+      nature?: number;
+      skills?: number[];
+    }
+  ): Promise<void> {
     const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     
     // 获取精灵配置
@@ -23,8 +47,10 @@ export class PetService {
 
     // 检查背包空间
     const bagSpace = 6 - petData.PetList.filter(p => p.isInBag).length;
-    if (bagSpace <= 0) {
-      throw new Error('背包已满');
+    const isInBag = bagSpace > 0; // 背包有空间就放背包，否则放仓库
+    
+    if (!isInBag) {
+      Logger.Info(`[PetService] 背包已满，精灵将放入仓库: uid=${uid}, petId=${petId}`);
     }
 
     // 创建精灵对象（使用 GameServer 的方式）
@@ -32,24 +58,92 @@ export class PetService {
     newPet.level = level;
     newPet.obtainLevel = level;
     
+    // 如果提供了自定义属性，应用它们
+    if (customStats) {
+      if (customStats.dvHp !== undefined) newPet.dvHp = Math.max(0, Math.min(31, customStats.dvHp));
+      if (customStats.dvAtk !== undefined) newPet.dvAtk = Math.max(0, Math.min(31, customStats.dvAtk));
+      if (customStats.dvDef !== undefined) newPet.dvDef = Math.max(0, Math.min(31, customStats.dvDef));
+      if (customStats.dvSpAtk !== undefined) newPet.dvSpAtk = Math.max(0, Math.min(31, customStats.dvSpAtk));
+      if (customStats.dvSpDef !== undefined) newPet.dvSpDef = Math.max(0, Math.min(31, customStats.dvSpDef));
+      if (customStats.dvSpeed !== undefined) newPet.dvSpeed = Math.max(0, Math.min(31, customStats.dvSpeed));
+      
+      if (customStats.evHp !== undefined) newPet.evHp = Math.max(0, Math.min(255, customStats.evHp));
+      if (customStats.evAtk !== undefined) newPet.evAtk = Math.max(0, Math.min(255, customStats.evAtk));
+      if (customStats.evDef !== undefined) newPet.evDef = Math.max(0, Math.min(255, customStats.evDef));
+      if (customStats.evSpAtk !== undefined) newPet.evSpAtk = Math.max(0, Math.min(255, customStats.evSpAtk));
+      if (customStats.evSpDef !== undefined) newPet.evSpDef = Math.max(0, Math.min(255, customStats.evSpDef));
+      if (customStats.evSpeed !== undefined) newPet.evSpeed = Math.max(0, Math.min(255, customStats.evSpeed));
+      
+      if (customStats.nature !== undefined) newPet.nature = Math.max(0, Math.min(24, customStats.nature));
+    }
+    
     // 使用 PetCalculator 计算正确的属性
     PetCalculator.UpdatePetStats(newPet);
     
-    // 使用 SptSystem 获取默认技能
-    const defaultSkills = SptSystem.GetDefaultSkills(petId, level);
-    newPet.skillArray = defaultSkills.slice(0, 4).map(skill => skill.id);
+    // 分配技能
+    if (customStats?.skills && customStats.skills.length > 0) {
+      // 验证技能ID有效性
+      const validSkills: number[] = [];
+      const invalidSkills: number[] = [];
+      
+      for (const skillId of customStats.skills.slice(0, 4)) {
+        const skillConfig = GameConfig.GetSkillById(skillId);
+        if (skillConfig) {
+          validSkills.push(skillId);
+        } else {
+          invalidSkills.push(skillId);
+          Logger.Warn(`[PetService] 无效的技能ID: ${skillId}`);
+        }
+      }
+      
+      if (invalidSkills.length > 0) {
+        throw new Error(`无效的技能ID: ${invalidSkills.join(', ')}`);
+      }
+      
+      // 使用自定义技能
+      newPet.skillArray = validSkills;
+      Logger.Info(`[PetService] 使用自定义技能: ${newPet.skillArray.join(',')}`);
+    } else {
+      // 使用 SptSystem 获取默认技能
+      const defaultSkills = SptSystem.GetDefaultSkills(petId, level);
+      newPet.skillArray = defaultSkills.slice(0, 4).map(skill => skill.id);
+    }
     
-    // 添加到背包
+    // 设置精灵位置（背包或仓库）
+    newPet.isInBag = isInBag;
+    
+    // 添加到背包或仓库
     petData.AddPet(newPet);
     
-    Logger.Info(`[PetService] 发送精灵成功: uid=${uid}, petId=${petId}, level=${level}, catchTime=${newPet.catchTime}, skills=${newPet.skillArray.join(',')}`);
+    Logger.Info(`[PetService] 发送精灵成功: uid=${uid}, petId=${petId}, level=${level}, isInBag=${isInBag}, catchTime=${newPet.catchTime}, skills=${newPet.skillArray.join(',')}`);
+    
+    // 如果玩家在线，发送系统消息通知
+    try {
+      if (OnlineTracker.Instance.IsOnline(uid)) {
+        const player = PlayerManager.GetInstance().GetPlayer(uid);
+        if (player) {
+          // 获取精灵名称
+          const petName = petConfig.DefName || `精灵#${petId}`;
+          const location = isInBag ? '背包' : '仓库';
+          const message = `恭喜你获得了 ${petName}（等级${level}），已放入${location}！`;
+          
+          // 发送系统消息通知 (SYSTEM_MESSAGE - CMD 8002)
+          await player.SendPacket(new PacketSystemMessage(message, 0, 0));
+          Logger.Info(`[PetService] 已发送获得精灵通知给在线玩家: uid=${uid}, petId=${petId}, message=${message}`);
+        }
+      }
+    } catch (error) {
+      Logger.Warn(`[PetService] 发送精灵通知失败: uid=${uid}, error=${error}`);
+      // 不影响主流程，继续执行
+    }
   }
 
   /**
    * 删除精灵
    */
   public async removePet(uid: number, catchTime: number): Promise<void> {
-    const petData = await DatabaseHelper.Instance.GetInstance_PetData(uid);
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     if (!petData) {
       throw new Error('玩家精灵数据不存在');
     }
@@ -68,7 +162,8 @@ export class PetService {
    * 修改精灵属性
    */
   public async updatePet(uid: number, catchTime: number, field: string, value: any): Promise<void> {
-    const petData = await DatabaseHelper.Instance.GetInstance_PetData(uid);
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     if (!petData) {
       throw new Error('玩家精灵数据不存在');
     }
@@ -156,10 +251,148 @@ export class PetService {
   }
 
   /**
+   * 批量修改精灵属性
+   */
+  public async updatePetBatch(uid: number, updateData: {
+    catchTime: number;
+    level?: number;
+    nature?: number;
+    exp?: number;
+    hp?: number;
+    maxHp?: number;
+    atk?: number;
+    def?: number;
+    spAtk?: number;
+    spDef?: number;
+    speed?: number;
+    evHp?: number;
+    evAtk?: number;
+    evDef?: number;
+    evSpAtk?: number;
+    evSpDef?: number;
+    evSpeed?: number;
+    dvHp?: number;
+    dvAtk?: number;
+    dvDef?: number;
+    dvSpAtk?: number;
+    dvSpDef?: number;
+    dvSpeed?: number;
+    skills?: number[];
+  }): Promise<void> {
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
+    if (!petData) {
+      throw new Error('玩家精灵数据不存在');
+    }
+
+    const pet = petData.PetList.find(p => p.catchTime === updateData.catchTime);
+    if (!pet) {
+      throw new Error('精灵不存在');
+    }
+
+    // 更新基本属性
+    if (updateData.level !== undefined) {
+      pet.level = Math.max(1, Math.min(100, updateData.level));
+    }
+    if (updateData.nature !== undefined) {
+      pet.nature = Math.max(0, Math.min(24, updateData.nature));
+    }
+    if (updateData.exp !== undefined) {
+      pet.exp = Math.max(0, updateData.exp);
+    }
+
+    // 更新属性值（如果提供）
+    let hasDirectStats = false;
+    if (updateData.hp !== undefined) {
+      pet.hp = Math.max(1, Math.min(9999, updateData.hp));
+      hasDirectStats = true;
+    }
+    if (updateData.maxHp !== undefined) {
+      pet.maxHp = Math.max(1, Math.min(9999, updateData.maxHp));
+      hasDirectStats = true;
+    }
+    if (updateData.atk !== undefined) {
+      pet.atk = Math.max(1, Math.min(9999, updateData.atk));
+      hasDirectStats = true;
+    }
+    if (updateData.def !== undefined) {
+      pet.def = Math.max(1, Math.min(9999, updateData.def));
+      hasDirectStats = true;
+    }
+    if (updateData.spAtk !== undefined) {
+      pet.spAtk = Math.max(1, Math.min(9999, updateData.spAtk));
+      hasDirectStats = true;
+    }
+    if (updateData.spDef !== undefined) {
+      pet.spDef = Math.max(1, Math.min(9999, updateData.spDef));
+      hasDirectStats = true;
+    }
+    if (updateData.speed !== undefined) {
+      pet.speed = Math.max(1, Math.min(9999, updateData.speed));
+      hasDirectStats = true;
+    }
+
+    // 更新努力值
+    if (updateData.evHp !== undefined) pet.evHp = Math.max(0, Math.min(255, updateData.evHp));
+    if (updateData.evAtk !== undefined) pet.evAtk = Math.max(0, Math.min(255, updateData.evAtk));
+    if (updateData.evDef !== undefined) pet.evDef = Math.max(0, Math.min(255, updateData.evDef));
+    if (updateData.evSpAtk !== undefined) pet.evSpAtk = Math.max(0, Math.min(255, updateData.evSpAtk));
+    if (updateData.evSpDef !== undefined) pet.evSpDef = Math.max(0, Math.min(255, updateData.evSpDef));
+    if (updateData.evSpeed !== undefined) pet.evSpeed = Math.max(0, Math.min(255, updateData.evSpeed));
+
+    // 更新个体值
+    if (updateData.dvHp !== undefined) pet.dvHp = Math.max(0, Math.min(31, updateData.dvHp));
+    if (updateData.dvAtk !== undefined) pet.dvAtk = Math.max(0, Math.min(31, updateData.dvAtk));
+    if (updateData.dvDef !== undefined) pet.dvDef = Math.max(0, Math.min(31, updateData.dvDef));
+    if (updateData.dvSpAtk !== undefined) pet.dvSpAtk = Math.max(0, Math.min(31, updateData.dvSpAtk));
+    if (updateData.dvSpDef !== undefined) pet.dvSpDef = Math.max(0, Math.min(31, updateData.dvSpDef));
+    if (updateData.dvSpeed !== undefined) pet.dvSpeed = Math.max(0, Math.min(31, updateData.dvSpeed));
+
+    // 更新技能
+    if (updateData.skills && updateData.skills.length > 0) {
+      // 验证技能ID有效性
+      const validSkills: number[] = [];
+      const invalidSkills: number[] = [];
+      
+      for (const skillId of updateData.skills.slice(0, 4)) {
+        if (skillId === 0) continue; // 跳过空技能槽
+        
+        const skillConfig = GameConfig.GetSkillById(skillId);
+        if (skillConfig) {
+          validSkills.push(skillId);
+        } else {
+          invalidSkills.push(skillId);
+          Logger.Warn(`[PetService] 无效的技能ID: ${skillId}`);
+        }
+      }
+      
+      if (invalidSkills.length > 0) {
+        throw new Error(`无效的技能ID: ${invalidSkills.join(', ')}`);
+      }
+      
+      // 更新技能数组
+      pet.skillArray = validSkills;
+      Logger.Info(`[PetService] 更新技能: ${pet.skillArray.join(',')}`);
+    }
+
+    // 只有在没有直接设置属性值时才重新计算
+    if (!hasDirectStats) {
+      // 重新计算属性
+      PetCalculator.UpdatePetStats(pet);
+      Logger.Info(`[PetService] 自动重新计算精灵属性`);
+    } else {
+      Logger.Info(`[PetService] 使用手动设置的属性值，跳过自动计算`);
+    }
+
+    Logger.Info(`[PetService] 批量修改精灵属性成功: uid=${uid}, catchTime=${updateData.catchTime}`);
+  }
+
+  /**
    * 获取玩家精灵列表
    */
   public async getPlayerPets(uid: number): Promise<IPetInfo[]> {
-    const petData = await DatabaseHelper.Instance.GetInstance_PetData(uid);
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     if (!petData) {
       return [];
     }
@@ -170,7 +403,8 @@ export class PetService {
    * 治疗精灵（恢复满血）
    */
   public async curePet(uid: number, catchTime: number): Promise<void> {
-    const petData = await DatabaseHelper.Instance.GetInstance_PetData(uid);
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     if (!petData) {
       throw new Error('玩家精灵数据不存在');
     }
@@ -188,7 +422,8 @@ export class PetService {
    * 治疗所有精灵
    */
   public async cureAllPets(uid: number): Promise<void> {
-    const petData = await DatabaseHelper.Instance.GetInstance_PetData(uid);
+    // 使用 GetInstanceOrCreateNew 以支持离线玩家
+    const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
     if (!petData) {
       throw new Error('玩家精灵数据不存在');
     }

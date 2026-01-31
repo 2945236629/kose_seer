@@ -52,9 +52,24 @@ gmRouter.post('/players/:uid', async (req, res) => {
 gmRouter.post('/players/:uid/ban', async (req, res) => {
   try {
     const { uid } = req.params;
-    const { banned, reason } = req.body;
-    await gmService.banPlayer(Number(uid), banned, reason);
-    res.json({ success: true, message: banned ? '玩家已封禁' : '玩家已解封' });
+    const { banType, reason } = req.body;
+    
+    Logger.Info(`[GMRouter] 收到封禁请求: uid=${uid}, banType=${banType}, reason=${reason}`);
+    
+    await gmService.banPlayer(Number(uid), banType, reason);
+    
+    const banTypeNames: { [key: number]: string } = {
+      0: '解封',
+      1: '24小时封停',
+      2: '7天封停',
+      3: '14天封停',
+      4: '永久封停'
+    };
+    
+    res.json({ 
+      success: true, 
+      message: `玩家已${banTypeNames[banType] || '处理'}` 
+    });
   } catch (error) {
     Logger.Error(`[GMRouter] 封禁/解封玩家失败: ${req.params.uid}`, error as Error);
     res.status(500).json({ success: false, error: (error as Error).message });
@@ -80,8 +95,8 @@ gmRouter.post('/players/:uid/kick', async (req, res) => {
 gmRouter.post('/players/:uid/items', async (req, res) => {
   try {
     const { uid } = req.params;
-    const { itemId, count } = req.body;
-    await gmService.giveItem(Number(uid), itemId, count);
+    const { itemId, count, expireTime } = req.body;
+    await gmService.giveItem(Number(uid), itemId, count, expireTime || 0);
     res.json({ success: true, message: '物品发送成功' });
   } catch (error) {
     Logger.Error(`[GMRouter] 发送物品失败: ${req.params.uid}`, error as Error);

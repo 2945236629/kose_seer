@@ -2,8 +2,10 @@
   <el-dialog
     v-model="visible"
     :title="`精灵详情 - ${petName}`"
-    width="800px"
+    width="1000px"
     @close="handleClose"
+    :lock-scroll="false"
+    class="pet-detail-dialog"
   >
     <div v-if="pet" class="pet-detail-content">
       <!-- 基本信息 -->
@@ -12,15 +14,67 @@
           <div class="card-header">
             <el-icon><InfoFilled /></el-icon>
             <span>基本信息</span>
+            <el-button 
+              v-if="!isEditing" 
+              size="small" 
+              type="primary" 
+              @click="startEdit"
+              style="margin-left: auto"
+            >
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <div v-else style="margin-left: auto; display: flex; gap: 8px;">
+              <el-button size="small" @click="cancelEdit">取消</el-button>
+              <el-button size="small" type="primary" @click="saveEdit">保存</el-button>
+            </div>
           </div>
         </template>
         <el-descriptions :column="3" border size="small">
           <el-descriptions-item label="精灵ID">{{ pet.id }}</el-descriptions-item>
           <el-descriptions-item label="精灵名称">{{ petName }}</el-descriptions-item>
-          <el-descriptions-item label="等级">Lv.{{ pet.level }}</el-descriptions-item>
+          <el-descriptions-item label="等级">
+            <span v-if="!isEditing">Lv.{{ pet.level }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.level" 
+              :min="1" 
+              :max="100"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
           <el-descriptions-item label="捕获时间" :span="2">{{ formatCatchTime(pet.catchTime) }}</el-descriptions-item>
-          <el-descriptions-item label="性格">{{ getNatureName(pet.nature) }}</el-descriptions-item>
-          <el-descriptions-item label="经验值" :span="3">{{ pet.exp?.toLocaleString() || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="性格">
+            <span v-if="!isEditing">{{ getNatureName(pet.nature) }}</span>
+            <el-select 
+              v-else
+              v-model="editForm.nature" 
+              filterable 
+              size="small"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="nature in natureOptions"
+                :key="nature.id"
+                :label="`${nature.id} - ${nature.name}`"
+                :value="nature.id"
+              />
+            </el-select>
+          </el-descriptions-item>
+          <el-descriptions-item label="经验值" :span="3">
+            <span v-if="!isEditing">{{ pet.exp?.toLocaleString() || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.exp" 
+              :min="0" 
+              :max="999999999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
         </el-descriptions>
       </el-card>
 
@@ -30,16 +84,99 @@
           <div class="card-header">
             <el-icon><TrendCharts /></el-icon>
             <span>属性值</span>
+            <el-tooltip v-if="!isEditing" content="属性值由等级、DV、EV自动计算" placement="top">
+              <el-icon style="color: #6b7280; cursor: help;"><InfoFilled /></el-icon>
+            </el-tooltip>
           </div>
         </template>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="HP">{{ pet.hp }} / {{ pet.maxHp }}</el-descriptions-item>
-          <el-descriptions-item label="攻击">{{ pet.atk }}</el-descriptions-item>
-          <el-descriptions-item label="防御">{{ pet.def }}</el-descriptions-item>
-          <el-descriptions-item label="特攻">{{ pet.spAtk }}</el-descriptions-item>
-          <el-descriptions-item label="特防">{{ pet.spDef }}</el-descriptions-item>
-          <el-descriptions-item label="速度">{{ pet.speed }}</el-descriptions-item>
+          <el-descriptions-item label="HP">
+            <span v-if="!isEditing">{{ pet.hp }} / {{ pet.maxHp }}</span>
+            <div v-else style="display: flex; gap: 8px; align-items: center;">
+              <el-input-number 
+                v-model="editForm.hp" 
+                :min="1" 
+                :max="9999"
+                size="small"
+                controls-position="right"
+                style="width: 80px"
+              />
+              <span>/</span>
+              <el-input-number 
+                v-model="editForm.maxHp" 
+                :min="1" 
+                :max="9999"
+                size="small"
+                controls-position="right"
+                style="width: 80px"
+              />
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="攻击">
+            <span v-if="!isEditing">{{ pet.atk }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.atk" 
+              :min="1" 
+              :max="9999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="防御">
+            <span v-if="!isEditing">{{ pet.def }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.def" 
+              :min="1" 
+              :max="9999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特攻">
+            <span v-if="!isEditing">{{ pet.spAtk }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.spAtk" 
+              :min="1" 
+              :max="9999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特防">
+            <span v-if="!isEditing">{{ pet.spDef }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.spDef" 
+              :min="1" 
+              :max="9999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="速度">
+            <span v-if="!isEditing">{{ pet.speed }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.speed" 
+              :min="1" 
+              :max="9999"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
         </el-descriptions>
+        <div v-if="isEditing" style="margin-top: 12px; padding: 8px; background: #fef3c7; border-radius: 6px; font-size: 12px; color: #92400e;">
+          <el-icon style="vertical-align: middle;"><Warning /></el-icon>
+          注意：直接修改属性值会覆盖自动计算的结果。保存后，这些值不会随等级、DV、EV变化而自动更新。
+        </div>
       </el-card>
 
       <!-- 努力值 (EV) -->
@@ -51,12 +188,78 @@
           </div>
         </template>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="HP">{{ pet.evHp || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="攻击">{{ pet.evAtk || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="防御">{{ pet.evDef || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="特攻">{{ pet.evSpAtk || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="特防">{{ pet.evSpDef || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="速度">{{ pet.evSpeed || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="HP">
+            <span v-if="!isEditing">{{ pet.evHp || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evHp" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="攻击">
+            <span v-if="!isEditing">{{ pet.evAtk || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evAtk" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="防御">
+            <span v-if="!isEditing">{{ pet.evDef || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evDef" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特攻">
+            <span v-if="!isEditing">{{ pet.evSpAtk || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evSpAtk" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特防">
+            <span v-if="!isEditing">{{ pet.evSpDef || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evSpDef" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="速度">
+            <span v-if="!isEditing">{{ pet.evSpeed || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.evSpeed" 
+              :min="0" 
+              :max="255"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
         </el-descriptions>
       </el-card>
 
@@ -69,12 +272,78 @@
           </div>
         </template>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="HP">{{ pet.dvHp || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="攻击">{{ pet.dvAtk || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="防御">{{ pet.dvDef || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="特攻">{{ pet.dvSpAtk || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="特防">{{ pet.dvSpDef || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="速度">{{ pet.dvSpeed || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="HP">
+            <span v-if="!isEditing">{{ pet.dvHp || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvHp" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="攻击">
+            <span v-if="!isEditing">{{ pet.dvAtk || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvAtk" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="防御">
+            <span v-if="!isEditing">{{ pet.dvDef || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvDef" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特攻">
+            <span v-if="!isEditing">{{ pet.dvSpAtk || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvSpAtk" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="特防">
+            <span v-if="!isEditing">{{ pet.dvSpDef || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvSpDef" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
+          <el-descriptions-item label="速度">
+            <span v-if="!isEditing">{{ pet.dvSpeed || 0 }}</span>
+            <el-input-number 
+              v-else
+              v-model="editForm.dvSpeed" 
+              :min="0" 
+              :max="31"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-descriptions-item>
         </el-descriptions>
       </el-card>
 
@@ -86,32 +355,120 @@
             <span>技能列表</span>
           </div>
         </template>
-        <div v-if="pet.skillArray && pet.skillArray.length > 0" class="skill-list">
-          <div v-for="(skill, index) in pet.skillArray" :key="index" class="skill-item">
-            <div class="skill-info">
-              <span class="skill-name">{{ getSkillName(skill.id) }}</span>
-              <span class="skill-id">(ID: {{ skill.id }})</span>
+        
+        <!-- 查看模式 -->
+        <div v-if="!isEditing">
+          <div v-if="pet.skillArray && pet.skillArray.length > 0" class="skill-list">
+            <div v-for="(skill, index) in pet.skillArray" :key="index" class="skill-item">
+              <div class="skill-info">
+                <span class="skill-name">{{ getSkillName(skill.id) }}</span>
+                <span class="skill-id">(ID: {{ skill.id }})</span>
+              </div>
+              <div class="skill-pp">
+                <span>PP: {{ skill.pp }} / {{ skill.maxPp }}</span>
+              </div>
             </div>
-            <div class="skill-pp">
-              <span>PP: {{ skill.pp }} / {{ skill.maxPp }}</span>
+          </div>
+          <div v-else class="empty-text">暂无技能</div>
+        </div>
+
+        <!-- 编辑模式 -->
+        <div v-else class="skill-edit-container">
+          <!-- 技能过滤按钮 -->
+          <div class="skill-filter-buttons">
+            <el-button 
+              :type="skillFilterMode === 'current' ? 'primary' : 'default'"
+              size="small"
+              @click="skillFilterMode = 'current'"
+            >
+              当前精灵全部技能
+            </el-button>
+            <el-button 
+              :type="skillFilterMode === 'all' ? 'primary' : 'default'"
+              size="small"
+              @click="skillFilterMode = 'all'"
+            >
+              所有精灵全部技能
+            </el-button>
+          </div>
+
+          <!-- 技能编辑区域 -->
+          <div class="skill-edit-layout">
+            <!-- 左侧：当前技能 -->
+            <div class="skill-column current-skills">
+              <div class="column-title">当前技能</div>
+              <div class="skill-slots">
+                <div 
+                  v-for="(skill, index) in editForm.skillArray" 
+                  :key="index" 
+                  class="skill-slot"
+                  :class="{ 'empty': !skill.id }"
+                >
+                  <div v-if="skill.id" class="skill-content">
+                    <div class="skill-info">
+                      <span class="skill-name">{{ getSkillName(skill.id) }}</span>
+                      <span class="skill-id">(ID: {{ skill.id }})</span>
+                    </div>
+                  </div>
+                  <div v-else class="empty-slot">空技能槽</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 中间：操作按钮 -->
+            <div class="skill-column actions">
+              <div class="column-title">操作</div>
+              <div class="action-buttons">
+                <el-button 
+                  v-for="index in 4" 
+                  :key="index"
+                  size="small"
+                  :disabled="!selectedSkillId"
+                  @click="replaceSkill(index - 1)"
+                  style="width: 100%"
+                >
+                  替换技能{{ index }}
+                </el-button>
+              </div>
+            </div>
+
+            <!-- 右侧：全部技能 -->
+            <div class="skill-column all-skills">
+              <div class="column-title">全部技能</div>
+              <PaginatedSelect
+                :key="skillSelectKey"
+                v-model="selectedSkillId"
+                placeholder="搜索并选择技能"
+                :fetch-data="fetchSkillDataForEdit"
+                :page-size="50"
+                style="margin-bottom: 12px"
+              />
+              <div v-if="selectedSkillId" class="selected-skill-preview">
+                <div class="skill-info">
+                  <span class="skill-name">{{ getSkillName(selectedSkillId) }}</span>
+                  <span class="skill-id">(ID: {{ selectedSkillId }})</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div v-else class="empty-text">暂无技能</div>
       </el-card>
     </div>
 
     <template #footer>
       <el-button @click="handleClose">关闭</el-button>
-      <el-button type="primary" @click="handleEdit">编辑</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { InfoFilled, TrendCharts, Promotion, Star, MagicStick } from '@element-plus/icons-vue'
+import { InfoFilled, TrendCharts, Promotion, Star, MagicStick, Edit, Warning } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useConfigStore } from '@/stores/config'
+import { configApi } from '@/api/config'
+import { gmApi } from '@/api/gm'
+import PaginatedSelect from './PaginatedSelect.vue'
 
 interface Props {
   modelValue: boolean
@@ -121,6 +478,7 @@ interface Props {
 interface Emits {
   (e: 'update:modelValue', value: boolean): void
   (e: 'edit', pet: any): void
+  (e: 'refresh'): void
 }
 
 const props = defineProps<Props>()
@@ -129,10 +487,81 @@ const emit = defineEmits<Emits>()
 const configStore = useConfigStore()
 
 const visible = ref(props.modelValue)
+const isEditing = ref(false)
+const skillFilterMode = ref<'current' | 'all'>('all')
+const selectedSkillId = ref<number>(0)
+const skillSelectKey = ref(0) // 用于强制刷新 PaginatedSelect
+
+// 监听技能过滤模式变化，强制刷新选择器
+watch(skillFilterMode, () => {
+  console.log('[PetDetailDialog] 技能过滤模式变化:', skillFilterMode.value)
+  selectedSkillId.value = 0
+  skillSelectKey.value++ // 强制刷新 PaginatedSelect
+})
+
+// 性格选项
+const natureOptions = ref([
+  { id: 0, name: '勤奋', category: '平衡' },
+  { id: 1, name: '孤独', category: '攻击↑ 防御↓' },
+  { id: 2, name: '勇敢', category: '攻击↑ 速度↓' },
+  { id: 3, name: '固执', category: '攻击↑ 特攻↓' },
+  { id: 4, name: '调皮', category: '攻击↑ 特防↓' },
+  { id: 5, name: '大胆', category: '防御↑ 攻击↓' },
+  { id: 6, name: '坦率', category: '防御↑ 特攻↓' },
+  { id: 7, name: '悠闲', category: '防御↑ 速度↓' },
+  { id: 8, name: '淘气', category: '防御↑ 特防↓' },
+  { id: 9, name: '乐天', category: '特攻↑ 攻击↓' },
+  { id: 10, name: '胆小', category: '速度↑ 攻击↓' },
+  { id: 11, name: '急躁', category: '速度↑ 防御↓' },
+  { id: 12, name: '认真', category: '速度↑ 特攻↓' },
+  { id: 13, name: '爽朗', category: '速度↑ 特防↓' },
+  { id: 14, name: '天真', category: '速度↑ 特防↓' },
+  { id: 15, name: '内敛', category: '特攻↑ 攻击↓' },
+  { id: 16, name: '慢吞吞', category: '特攻↑ 速度↓' },
+  { id: 17, name: '冷静', category: '特攻↑ 速度↓' },
+  { id: 18, name: '温和', category: '特防↑ 攻击↓' },
+  { id: 19, name: '温顺', category: '特防↑ 防御↓' },
+  { id: 20, name: '马虎', category: '特防↑ 速度↓' },
+  { id: 21, name: '慎重', category: '特防↑ 速度↓' },
+  { id: 22, name: '浮躁', category: '特攻↑ 防御↓' },
+  { id: 23, name: '狂妄', category: '特攻↑ 特防↓' },
+  { id: 24, name: '沉着', category: '特防↑ 特攻↓' }
+])
+
+// 编辑表单
+const editForm = ref<any>({
+  level: 1,
+  nature: 0,
+  exp: 0,
+  hp: 0,
+  maxHp: 0,
+  atk: 0,
+  def: 0,
+  spAtk: 0,
+  spDef: 0,
+  speed: 0,
+  evHp: 0,
+  evAtk: 0,
+  evDef: 0,
+  evSpAtk: 0,
+  evSpDef: 0,
+  evSpeed: 0,
+  dvHp: 0,
+  dvAtk: 0,
+  dvDef: 0,
+  dvSpAtk: 0,
+  dvSpDef: 0,
+  dvSpeed: 0,
+  skillArray: []
+})
 
 // 监听外部变化
 watch(() => props.modelValue, (val) => {
   visible.value = val
+  if (val) {
+    isEditing.value = false
+    selectedSkillId.value = 0
+  }
 })
 
 // 监听内部变化
@@ -168,35 +597,8 @@ const petName = computed(() => {
 
 // 获取性格名称
 const getNatureName = (natureId: number) => {
-  // TODO: 从配置中获取性格名称
-  const natureMap: Record<number, string> = {
-    0: '勤奋',
-    1: '孤独',
-    2: '勇敢',
-    3: '固执',
-    4: '调皮',
-    5: '大胆',
-    6: '坦率',
-    7: '悠闲',
-    8: '淘气',
-    9: '乐天',
-    10: '胆小',
-    11: '急躁',
-    12: '认真',
-    13: '爽朗',
-    14: '天真',
-    15: '内敛',
-    16: '慢吞吞',
-    17: '冷静',
-    18: '温和',
-    19: '温顺',
-    20: '马虎',
-    21: '慎重',
-    22: '浮躁',
-    23: '狂妄',
-    24: '沉着'
-  }
-  return natureMap[natureId] || `未知性格(${natureId})`
+  const nature = natureOptions.value.find(n => n.id === natureId)
+  return nature ? `${nature.name} (${nature.category})` : `未知性格(${natureId})`
 }
 
 // 获取技能名称
@@ -205,16 +607,225 @@ const getSkillName = (skillId: number | undefined) => {
   return configStore.skillNames[skillId] || `未知技能(${skillId})`
 }
 
-const handleClose = () => {
-  visible.value = false
+// 获取技能数据（用于分页选择器）
+const fetchSkillDataForEdit = async (query: string, page: number, pageSize: number) => {
+  console.log('[PetDetailDialog] fetchSkillDataForEdit 调用:', { 
+    skillFilterMode: skillFilterMode.value, 
+    petId: props.pet?.id,
+    query, 
+    page, 
+    pageSize 
+  })
+  
+  if (skillFilterMode.value === 'current') {
+    // 获取当前精灵的技能
+    const result = await fetchCurrentPetSkills(query, page, pageSize)
+    console.log('[PetDetailDialog] 当前精灵技能结果:', result)
+    return result
+  } else {
+    // 获取所有技能
+    const res = await configApi.searchSkills(query, page, pageSize) as any
+    const result = res.data || res
+    console.log('[PetDetailDialog] 所有技能结果:', result)
+    return result
+  }
 }
 
-const handleEdit = () => {
-  emit('edit', props.pet)
+// 获取当前精灵的技能
+const fetchCurrentPetSkills = async (query: string, page: number, pageSize: number) => {
+  try {
+    console.log('[PetDetailDialog] fetchCurrentPetSkills 调用:', { 
+      petId: props.pet?.id, 
+      query, 
+      page, 
+      pageSize 
+    })
+    
+    if (!props.pet || !props.pet.id) {
+      console.warn('[PetDetailDialog] 精灵数据无效')
+      return { items: [], total: 0 }
+    }
+    
+    // 调用后端API获取当前精灵的所有技能
+    const res = await configApi.searchPetSkills(props.pet.id, query, page, pageSize) as any
+    const result = res.data || res
+    
+    console.log('[PetDetailDialog] fetchCurrentPetSkills 结果:', result)
+    
+    return result
+  } catch (error) {
+    console.error('[PetDetailDialog] 获取当前精灵技能失败:', error)
+    return { items: [], total: 0 }
+  }
+}
+
+// 开始编辑
+const startEdit = () => {
+  if (!props.pet) return
+  
+  // 深拷贝当前精灵数据到编辑表单
+  editForm.value = {
+    level: props.pet.level || 1,
+    nature: props.pet.nature || 0,
+    exp: props.pet.exp || 0,
+    hp: props.pet.hp || 0,
+    maxHp: props.pet.maxHp || 0,
+    atk: props.pet.atk || 0,
+    def: props.pet.def || 0,
+    spAtk: props.pet.spAtk || 0,
+    spDef: props.pet.spDef || 0,
+    speed: props.pet.speed || 0,
+    evHp: props.pet.evHp || 0,
+    evAtk: props.pet.evAtk || 0,
+    evDef: props.pet.evDef || 0,
+    evSpAtk: props.pet.evSpAtk || 0,
+    evSpDef: props.pet.evSpDef || 0,
+    evSpeed: props.pet.evSpeed || 0,
+    dvHp: props.pet.dvHp || 0,
+    dvAtk: props.pet.dvAtk || 0,
+    dvDef: props.pet.dvDef || 0,
+    dvSpAtk: props.pet.dvSpAtk || 0,
+    dvSpDef: props.pet.dvSpDef || 0,
+    dvSpeed: props.pet.dvSpeed || 0,
+    skillArray: props.pet.skillArray ? JSON.parse(JSON.stringify(props.pet.skillArray)) : []
+  }
+  
+  // 确保技能数组有4个槽位
+  while (editForm.value.skillArray.length < 4) {
+    editForm.value.skillArray.push({ id: 0, pp: 0, maxPp: 0 })
+  }
+  
+  isEditing.value = true
+}
+
+// 取消编辑
+const cancelEdit = () => {
+  isEditing.value = false
+  selectedSkillId.value = 0
+}
+
+// 保存编辑
+const saveEdit = async () => {
+  try {
+    if (!props.pet) return
+    
+    // 验证数据
+    if (editForm.value.level < 1 || editForm.value.level > 100) {
+      ElMessage.error('等级必须在1-100之间')
+      return
+    }
+    
+    // 检查玩家是否在线
+    const isOnline = props.pet.isOnline || false
+    
+    // 如果玩家在线，显示确认对话框
+    if (isOnline) {
+      await ElMessageBox.confirm(
+        '修改精灵属性后，玩家会被踢下线，需要重新登录才能看到变化。是否继续？',
+        '确认修改',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+    }
+    
+    // 过滤掉空技能槽
+    const skills = editForm.value.skillArray
+      .filter((skill: any) => skill.id > 0)
+      .map((skill: any) => skill.id)
+    
+    // 调用后端API保存
+    const updateData = {
+      uid: props.pet.userID,
+      catchTime: props.pet.catchTime,
+      level: editForm.value.level,
+      nature: editForm.value.nature,
+      exp: editForm.value.exp,
+      hp: editForm.value.hp,
+      maxHp: editForm.value.maxHp,
+      atk: editForm.value.atk,
+      def: editForm.value.def,
+      spAtk: editForm.value.spAtk,
+      spDef: editForm.value.spDef,
+      speed: editForm.value.speed,
+      evHp: editForm.value.evHp,
+      evAtk: editForm.value.evAtk,
+      evDef: editForm.value.evDef,
+      evSpAtk: editForm.value.evSpAtk,
+      evSpDef: editForm.value.evSpDef,
+      evSpeed: editForm.value.evSpeed,
+      dvHp: editForm.value.dvHp,
+      dvAtk: editForm.value.dvAtk,
+      dvDef: editForm.value.dvDef,
+      dvSpAtk: editForm.value.dvSpAtk,
+      dvSpDef: editForm.value.dvSpDef,
+      dvSpeed: editForm.value.dvSpeed,
+      skills: skills
+    }
+    
+    await gmApi.updatePet(updateData)
+    
+    // 如果玩家在线，踢下线
+    if (isOnline) {
+      try {
+        await gmApi.kickPlayer(props.pet.userID, '精灵属性已修改，请重新登录')
+        ElMessage.success('保存成功，玩家已被踢下线')
+      } catch (kickError) {
+        console.error('踢出玩家失败:', kickError)
+        ElMessage.warning('保存成功，但踢出玩家失败')
+      }
+    } else {
+      ElMessage.success('保存成功')
+    }
+    
+    isEditing.value = false
+    selectedSkillId.value = 0
+    
+    // 触发刷新
+    emit('refresh')
+  } catch (error: any) {
+    // 用户取消操作
+    if (error === 'cancel') {
+      return
+    }
+    console.error('保存精灵数据失败:', error)
+    ElMessage.error('保存失败: ' + (error as any).message)
+  }
+}
+
+// 替换技能
+const replaceSkill = (slotIndex: number) => {
+  if (!selectedSkillId.value) {
+    ElMessage.warning('请先选择要替换的技能')
+    return
+  }
+  
+  if (slotIndex < 0 || slotIndex >= 4) {
+    ElMessage.error('技能槽位无效')
+    return
+  }
+  
+  // 替换技能
+  editForm.value.skillArray[slotIndex] = {
+    id: selectedSkillId.value,
+    pp: 20, // 默认PP值
+    maxPp: 20
+  }
+  
+  ElMessage.success(`已替换技能${slotIndex + 1}`)
+}
+
+const handleClose = () => {
+  visible.value = false
+  isEditing.value = false
+  selectedSkillId.value = 0
 }
 </script>
 
 <style scoped>
+/* 对话框内容区域滚动，与添加精灵对话框保持一致 */
 .pet-detail-content {
   max-height: 65vh;
   overflow-y: auto;
@@ -284,5 +895,130 @@ const handleEdit = () => {
   color: #9ca3af;
   padding: 40px 20px;
   font-size: 14px;
+}
+
+/* 技能编辑样式 */
+.skill-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skill-filter-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.skill-edit-layout {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  min-height: 300px;
+}
+
+.skill-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.column-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  text-align: center;
+}
+
+/* 当前技能列 */
+.current-skills .skill-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-slot {
+  padding: 12px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.skill-slot.empty {
+  border-style: dashed;
+  background: #fafafa;
+}
+
+.skill-slot .skill-content {
+  width: 100%;
+}
+
+.empty-slot {
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+  width: 100%;
+}
+
+/* 操作按钮列 */
+.actions {
+  justify-content: center;
+  min-width: 120px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  flex: 1;
+}
+
+/* 全部技能列 */
+.all-skills {
+  flex: 1;
+}
+
+.selected-skill-preview {
+  padding: 12px;
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+}
+
+.selected-skill-preview .skill-info {
+  justify-content: center;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .skill-edit-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .actions {
+    min-width: auto;
+  }
+  
+  .action-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .action-buttons .el-button {
+    flex: 1;
+    min-width: 120px;
+  }
 }
 </style>

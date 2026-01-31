@@ -18,13 +18,13 @@ export class PetController {
   public givePet = async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { uid } = req.params;
-      const { petId, level = 1, shiny = false } = req.body;
+      const { petId, level = 1, shiny = false, customStats } = req.body;
       
       if (!petId) {
         return res.status(400).json({ success: false, error: '缺少参数: petId' });
       }
       
-      await this.petService.givePet(Number(uid), petId, level, shiny);
+      await this.petService.givePet(Number(uid), petId, level, shiny, customStats);
       res.json({ success: true, message: '精灵发送成功' });
     } catch (error) {
       Logger.Error(`[PetController] 发送精灵失败: ${req.params.uid}`, error as Error);
@@ -53,18 +53,28 @@ export class PetController {
   };
 
   /**
-   * 修改精灵属性
+   * 修改精灵属性（批量更新）
    */
   public updatePet = async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { uid } = req.params;
-      const { catchTime, field, value } = req.body;
+      const updateData = req.body;
       
-      if (!catchTime || !field || value === undefined) {
-        return res.status(400).json({ success: false, error: '缺少参数: catchTime, field, value' });
+      if (!updateData.catchTime) {
+        return res.status(400).json({ success: false, error: '缺少参数: catchTime' });
       }
       
-      await this.petService.updatePet(Number(uid), catchTime, field, value);
+      // 支持两种模式：
+      // 1. 旧模式：{ catchTime, field, value }
+      // 2. 新模式：{ catchTime, level, nature, exp, evXxx, dvXxx, skills }
+      if (updateData.field && updateData.value !== undefined) {
+        // 旧模式：单字段更新
+        await this.petService.updatePet(Number(uid), updateData.catchTime, updateData.field, updateData.value);
+      } else {
+        // 新模式：批量更新
+        await this.petService.updatePetBatch(Number(uid), updateData);
+      }
+      
       res.json({ success: true, message: '精灵属性修改成功' });
     } catch (error) {
       Logger.Error(`[PetController] 修改精灵属性失败: ${req.params.uid}`, error as Error);

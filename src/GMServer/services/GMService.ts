@@ -2,6 +2,9 @@ import { DatabaseHelper } from '../../DataBase/DatabaseHelper';
 import { Logger } from '../../shared/utils/Logger';
 import { PlayerService } from './PlayerService';
 import { ServerService } from './ServerService';
+import { OnlineTracker } from '../../GameServer/Game/Player/OnlineTracker';
+import { PlayerManager } from '../../GameServer/Game/Player/PlayerManager';
+import { PacketItemBuy } from '../../GameServer/Server/Packet/Send/Item/PacketItemBuy';
 
 export class GMService {
   private playerService: PlayerService;
@@ -25,8 +28,8 @@ export class GMService {
     return this.playerService.updatePlayer(uid, field, value);
   }
 
-  public async banPlayer(uid: number, banned: boolean, reason?: string): Promise<void> {
-    return this.playerService.banPlayer(uid, banned, reason);
+  public async banPlayer(uid: number, banType: number, reason?: string): Promise<void> {
+    return this.playerService.banPlayer(uid, banType, reason);
   }
 
   public async kickPlayer(uid: number, reason?: string): Promise<void> {
@@ -35,10 +38,30 @@ export class GMService {
 
   // ==================== 物品管理 ====================
 
-  public async giveItem(uid: number, itemId: number, count: number): Promise<void> {
+  public async giveItem(uid: number, itemId: number, count: number, expireTime: number = 0): Promise<void> {
     const itemData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_ItemData(uid);
-    itemData.AddItem(itemId, count, 0);
-    Logger.Info(`[GMService] 发送物品: uid=${uid}, itemId=${itemId}, count=${count}`);
+    itemData.AddItem(itemId, count, expireTime);
+    Logger.Info(`[GMService] 发送物品: uid=${uid}, itemId=${itemId}, count=${count}, expireTime=${expireTime}`);
+    
+    // 如果玩家在线，发送通知
+    try {
+      if (OnlineTracker.Instance.IsOnline(uid)) {
+        const player = PlayerManager.GetInstance().GetPlayer(uid);
+        if (player) {
+          // 发送物品购买通知 (ITEM_BUY - CMD 2601)
+          await player.SendPacket(new PacketItemBuy(
+            player.Data.coins,  // 当前金币（不变）
+            itemId,
+            count,
+            expireTime
+          ));
+          Logger.Info(`[GMService] 已发送物品通知给在线玩家: uid=${uid}, itemId=${itemId}, count=${count}`);
+        }
+      }
+    } catch (error) {
+      Logger.Warn(`[GMService] 发送物品通知失败: uid=${uid}, error=${error}`);
+      // 不影响主流程，继续执行
+    }
   }
 
   public async givePet(uid: number, petId: number, level: number, shiny: boolean): Promise<void> {

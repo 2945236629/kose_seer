@@ -110,6 +110,51 @@ export class ConfigController {
     }
   };
 
+  // 搜索技能选项（分页）
+  public searchSkills = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { query = '', page = 1, pageSize = 50 } = req.query;
+      const result = await this.configService.searchSkillOptions(
+        query as string,
+        parseInt(page as string),
+        parseInt(pageSize as string)
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      Logger.Error('[ConfigController] 搜索技能失败', error as Error);
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  };
+
+  // 搜索指定精灵的技能选项（分页）
+  public searchPetSkills = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { petId } = req.params;
+      const { query = '', page = 1, pageSize = 50 } = req.query;
+      
+      Logger.Debug(`[ConfigController] searchPetSkills 请求: petId=${petId}, query="${query}", page=${page}, pageSize=${pageSize}`);
+      
+      if (!petId) {
+        res.status(400).json({ success: false, error: '缺少参数: petId' });
+        return;
+      }
+      
+      const result = await this.configService.searchPetSkillOptions(
+        parseInt(petId as string),
+        query as string,
+        parseInt(page as string),
+        parseInt(pageSize as string)
+      );
+      
+      Logger.Debug(`[ConfigController] searchPetSkills 返回: items=${result.items.length}, total=${result.total}`);
+      
+      res.json({ success: true, data: result });
+    } catch (error) {
+      Logger.Error('[ConfigController] 搜索精灵技能失败', error as Error);
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  };
+
   // 获取精灵名字映射
   public getPetNames = async (req: Request, res: Response): Promise<void> => {
     try {

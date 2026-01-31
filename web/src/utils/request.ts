@@ -33,10 +33,8 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
-    const res = response.data
-
-    // 返回完整的响应对象，让调用方自己处理 success 字段
-    return res
+    // 返回完整的响应对象，让调用方自己处理
+    return response
   },
   (error) => {
     console.error('Response error:', error)

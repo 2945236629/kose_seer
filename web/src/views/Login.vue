@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Monitor, Message, Lock, InfoFilled } from '@element-plus/icons-vue'
@@ -109,6 +109,27 @@ const rules = {
   ]
 }
 
+// 检查是否是本地模式
+const checkLocalMode = async () => {
+  try {
+    const response = await gmApi.getCurrentUser() as any
+    
+    if (response.success && response.data && response.data.isLocal) {
+      // 本地模式，自动跳转到首页
+      localStorage.setItem('gm_local_mode', 'true')
+      ElMessage.success('检测到本地模式，自动登录')
+      router.push('/')
+    }
+  } catch (error) {
+    // 非本地模式或检查失败，显示登录表单
+  }
+}
+
+// 组件挂载时检查本地模式
+onMounted(() => {
+  checkLocalMode()
+})
+
 const handleLogin = async () => {
   if (!formRef.value) return
   
@@ -124,6 +145,7 @@ const handleLogin = async () => {
       
       // 保存 token
       localStorage.setItem('gm_token', res.token)
+      localStorage.removeItem('gm_local_mode')
       
       ElMessage.success('登录成功')
       router.push('/')

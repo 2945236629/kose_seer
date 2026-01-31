@@ -179,6 +179,109 @@ export class ConfigService {
     }));
   }
 
+  // 搜索技能选项（支持分页和搜索）
+  public async searchSkillOptions(query: string = '', page: number = 1, pageSize: number = 50): Promise<{ items: any[], total: number }> {
+    const allOptions = await this.getSkillOptions();
+    
+    // 搜索过滤
+    let filtered = allOptions;
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = allOptions.filter(opt => 
+        opt.label.toLowerCase().includes(lowerQuery) ||
+        opt.value.toString().includes(query)
+      );
+    }
+    
+    // 分页
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const items = filtered.slice(start, end);
+    
+    return {
+      items,
+      total: filtered.length
+    };
+  }
+
+  // 搜索指定精灵的技能选项（支持分页和搜索）
+  public async searchPetSkillOptions(petId: number, query: string = '', page: number = 1, pageSize: number = 50): Promise<{ items: any[], total: number }> {
+    Logger.Debug(`[ConfigService] searchPetSkillOptions 调用: petId=${petId}, query="${query}", page=${page}, pageSize=${pageSize}`);
+    
+    // 获取精灵配置
+    const petConfig = GameConfig.GetPetById(petId);
+    if (!petConfig) {
+      Logger.Warn(`[ConfigService] 精灵 ${petId} 配置不存在`);
+      return { items: [], total: 0 };
+    }
+
+    Logger.Debug(`[ConfigService] 找到精灵配置: ${petConfig.DefName} (ID: ${petId})`);
+
+    // 获取精灵可学习的技能ID列表
+    const learnableSkillIds = new Set<number>();
+    
+    // 从 LearnableMoves 中获取技能
+    // LearnableMoves 是一个对象，包含 Move 属性，Move 可以是单个对象或数组
+    if (petConfig.LearnableMoves && petConfig.LearnableMoves.Move) {
+      const moves = petConfig.LearnableMoves.Move;
+      const moveArray = Array.isArray(moves) ? moves : [moves];
+      
+      Logger.Debug(`[ConfigService] LearnableMoves.Move 类型: ${Array.isArray(moves) ? 'Array' : 'Object'}, 数量: ${moveArray.length}`);
+      
+      moveArray.forEach((move: any) => {
+        if (move.ID) {
+          learnableSkillIds.add(move.ID);
+        }
+      });
+    } else {
+      Logger.Warn(`[ConfigService] 精灵 ${petId} (${petConfig.DefName}) 没有 LearnableMoves 或 LearnableMoves.Move`);
+    }
+
+    // 如果没有可学习的技能，返回空
+    if (learnableSkillIds.size === 0) {
+      Logger.Warn(`[ConfigService] 精灵 ${petId} (${petConfig.DefName}) 没有可学习的技能`);
+      return { items: [], total: 0 };
+    }
+
+    Logger.Debug(`[ConfigService] 精灵 ${petId} 可学习技能ID列表: [${Array.from(learnableSkillIds).slice(0, 10).join(', ')}${learnableSkillIds.size > 10 ? '...' : ''}]`);
+
+    // 获取所有技能
+    const allSkills = GameConfig.GetAllSkills();
+    Logger.Debug(`[ConfigService] 所有技能总数: ${allSkills.length}`);
+    
+    // 过滤出该精灵可学习的技能
+    let petSkills = allSkills
+      .filter((skill: any) => learnableSkillIds.has(skill.ID))
+      .map((skill: any) => ({
+        value: skill.ID,
+        label: `${skill.ID} - ${skill.Name || '未知'}`
+      }));
+
+    Logger.Debug(`[ConfigService] 过滤后精灵可学习技能数: ${petSkills.length}`);
+
+    // 搜索过滤
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      petSkills = petSkills.filter(opt => 
+        opt.label.toLowerCase().includes(lowerQuery) ||
+        opt.value.toString().includes(query)
+      );
+      Logger.Debug(`[ConfigService] 搜索 "${query}" 后技能数: ${petSkills.length}`);
+    }
+
+    // 分页
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const items = petSkills.slice(start, end);
+
+    Logger.Info(`[ConfigService] 精灵 ${petId} (${petConfig.DefName}) 可学习技能数: ${learnableSkillIds.size}, 搜索后: ${petSkills.length}, 返回: ${items.length}`);
+
+    return {
+      items,
+      total: petSkills.length
+    };
+  }
+
   // 获取物品选项
   private async getItemOptions(): Promise<any[]> {
     const items = GameConfig.GetAllItems();

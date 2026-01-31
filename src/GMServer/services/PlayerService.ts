@@ -2,6 +2,9 @@ import { DatabaseHelper } from '../../DataBase/DatabaseHelper';
 import { DatabaseManager } from '../../DataBase/DatabaseManager';
 import { Logger } from '../../shared/utils/Logger';
 import { GameConfig } from '../../shared/config/game/GameConfig';
+import { OnlineTracker } from '../../GameServer/Game/Player/OnlineTracker';
+import { PlayerManager } from '../../GameServer/Game/Player/PlayerManager';
+import { AccountRepository } from '../../DataBase/repositories/Player/AccountRepository';
 
 /**
  * 玩家管理服务
@@ -16,9 +19,6 @@ export class PlayerService {
     // 如果只查询在线玩家
     if (onlineOnly) {
       try {
-        const { PlayerManager } = await import('../../GameServer/Game/Player/PlayerManager');
-        const { OnlineTracker } = await import('../../GameServer/Game/Player/OnlineTracker');
-        
         const allPlayers = PlayerManager.GetInstance().GetAllPlayers();
         let filteredPlayers = allPlayers;
         
@@ -26,7 +26,7 @@ export class PlayerService {
         if (search) {
           const searchLower = search.toLowerCase();
           const searchNum = Number(search) || 0;
-          filteredPlayers = allPlayers.filter(p => 
+          filteredPlayers = allPlayers.filter((p: any) => 
             p.Data.nick.toLowerCase().includes(searchLower) || 
             p.Uid === searchNum
           );
@@ -35,7 +35,7 @@ export class PlayerService {
         const total = filteredPlayers.length;
         const paginatedPlayers = filteredPlayers.slice(offset, offset + limit);
         
-        const players = paginatedPlayers.map(player => {
+        const players = paginatedPlayers.map((player: any) => {
           const mapId = OnlineTracker.Instance.GetPlayerMap(player.Uid);
           
           return {
@@ -129,9 +129,8 @@ export class PlayerService {
     // 检查哪些玩家在线
     let onlinePlayerIds: Set<number> = new Set();
     try {
-      const { PlayerManager } = await import('../../GameServer/Game/Player/PlayerManager');
       const allPlayers = PlayerManager.GetInstance().GetAllPlayers();
-      onlinePlayerIds = new Set(allPlayers.map(p => p.Uid));
+      onlinePlayerIds = new Set(allPlayers.map((p: any) => p.Uid));
     } catch (error) {
       // PlayerManager未初始化，所有玩家都显示为离线
     }
@@ -268,6 +267,7 @@ export class PlayerService {
         }).filter(skill => skill !== null);
         
         return {
+          userID: uid, // 添加玩家ID（用于前端调用API）
           catchTime: pet.catchTime,
           id: pet.petId,
           level: pet.level,
@@ -357,18 +357,89 @@ export class PlayerService {
 
     // 根据字段更新数据
     switch (field) {
+      // 货币相关
       case 'coins':
         playerData.coins = value;
         break;
+      case 'energy':
+        playerData.energy = value;
+        break;
+      case 'fightBadge':
+        playerData.fightBadge = value;
+        break;
+      case 'allocatableExp':
+        playerData.allocatableExp = value;
+        break;
+      
+      // 基本信息
       case 'nick':
         playerData.nick = value;
+        break;
+      case 'color':
+        playerData.color = value;
+        break;
+      case 'texture':
+        playerData.texture = value;
+        break;
+      
+      // VIP相关
+      case 'vip':
+        playerData.vip = value;
         break;
       case 'vipLevel':
         playerData.vipLevel = value;
         break;
-      case 'vip':
-        playerData.vip = value;
+      case 'vipValue':
+        playerData.vipValue = value;
         break;
+      case 'vipStage':
+        playerData.vipStage = value;
+        break;
+      case 'vipEndTime':
+        playerData.vipEndTime = value;
+        break;
+      
+      // NoNo相关
+      case 'hasNono':
+        playerData.hasNono = value;
+        break;
+      case 'superNono':
+        playerData.superNono = value;
+        break;
+      case 'nonoNick':
+        playerData.nonoNick = value;
+        break;
+      case 'nonoColor':
+        playerData.nonoColor = value;
+        break;
+      case 'nonoPower':
+        playerData.nonoPower = value;
+        break;
+      case 'nonoMate':
+        playerData.nonoMate = value;
+        break;
+      
+      
+      // 倍率相关
+      case 'twoTimes':
+        playerData.twoTimes = value;
+        break;
+      case 'threeTimes':
+        playerData.threeTimes = value;
+        break;
+      case 'autoFight':
+        playerData.autoFight = value;
+        break;
+      case 'autoFightTimes':
+        playerData.autoFightTimes = value;
+        break;
+      case 'energyTimes':
+        playerData.energyTimes = value;
+        break;
+      case 'learnTimes':
+        playerData.learnTimes = value;
+        break;
+
       default:
         throw new Error(`不支持的字段: ${field}`);
     }
@@ -378,27 +449,129 @@ export class PlayerService {
   }
 
   /**
-   * 封禁/解封玩家
+   * 修改账号信息（邮箱、密码）
    */
-  public async banPlayer(uid: number, banned: boolean, reason?: string): Promise<void> {
-    // TODO: 实现封禁逻辑
-    // 1. 更新数据库封禁状态
-    // 2. 如果玩家在线，踢出游戏
-    Logger.Info(`[PlayerService] 玩家${banned ? '封禁' : '解封'}: uid=${uid}, reason=${reason}`);
+  public async updateAccount(uid: number, email?: string, password?: string): Promise<void> {
+    // 检查玩家是否存在
+    const playerData = await DatabaseHelper.Instance.GetInstance_PlayerData(uid);
+    if (!playerData) {
+      throw new Error('玩家不存在');
+    }
+
+    // 构建更新SQL
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (email) {
+      // 验证邮箱格式
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('邮箱格式不正确');
+      }
+      
+      // 检查邮箱是否已被使用
+      const existingSql = 'SELECT user_id FROM users WHERE email = ? AND user_id != ?';
+      const existing = await DatabaseManager.Instance.Query<{ user_id: number }>(existingSql, [email, uid]);
+      if (existing.length > 0) {
+        throw new Error('该邮箱已被其他账号使用');
+      }
+      
+      updates.push('email = ?');
+      params.push(email);
+    }
+
+    if (password) {
+      // 验证密码长度
+      if (password.length < 6) {
+        throw new Error('密码长度至少为6位');
+      }
+      
+      // 这里应该使用与注册时相同的密码加密方式
+      // 假设使用简单的MD5或bcrypt，需要根据实际情况调整
+      const crypto = require('crypto');
+      const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
+      
+      updates.push('password = ?');
+      params.push(hashedPassword);
+    }
+
+    if (updates.length === 0) {
+      throw new Error('没有需要更新的内容');
+    }
+
+    // 执行更新
+    params.push(uid);
+    const sql = `UPDATE users SET ${updates.join(', ')} WHERE user_id = ?`;
+    await DatabaseManager.Instance.Execute(sql, params);
+
+    Logger.Info(`[PlayerService] 账号信息已修改: uid=${uid}, email=${email ? '已更新' : '未更新'}, password=${password ? '已更新' : '未更新'}`);
+  }
+
+  /**
+   * 封禁/解封玩家
+   * @param uid 玩家ID
+   * @param banType 封禁类型 (0=解封, 1=24小时, 2=7天, 3=14天, 4=永久)
+   * @param reason 封禁原因
+   */
+  public async banPlayer(uid: number, banType: number, reason?: string): Promise<void> {
+    try {
+      const accountRepo = new AccountRepository();
+      
+      // 验证 banType 参数
+      if (banType === null || banType === undefined) {
+        throw new Error(`无效的封禁类型: ${banType}`);
+      }
+      
+      if (banType < 0 || banType > 4) {
+        throw new Error(`封禁类型超出范围: ${banType}，有效范围是 0-4`);
+      }
+      
+      Logger.Info(`[PlayerService] 准备更新账号状态: uid=${uid}, banType=${banType}, reason=${reason || '无'}`);
+      
+      // 1. 更新数据库封禁状态
+      const success = await accountRepo.UpdateStatus(uid, banType);
+      if (!success) {
+        throw new Error('更新账号状态失败，可能账号不存在');
+      }
+      
+      const banTypeNames: { [key: number]: string } = {
+        0: '解封',
+        1: '24小时封停',
+        2: '7天封停',
+        3: '14天封停',
+        4: '永久封停'
+      };
+      
+      Logger.Info(`[PlayerService] 账号状态已更新: uid=${uid}, status=${banType} (${banTypeNames[banType] || '未知'}), reason=${reason || '无'}`);
+      
+      // 2. 如果玩家在线且是封禁操作（非解封），踢出游戏
+      if (banType !== 0) {
+        try {
+          await this.kickPlayer(uid, `账号被${banTypeNames[banType]}，原因：${reason || '无'}`);
+        } catch (kickError) {
+          // 玩家可能不在线，忽略错误
+          Logger.Info(`[PlayerService] 玩家不在线或踢出失败: uid=${uid}, error=${(kickError as Error).message}`);
+        }
+      }
+      
+      Logger.Info(`[PlayerService] 玩家${banType === 0 ? '解封' : '封禁'}成功: uid=${uid}, banType=${banType}, reason=${reason || '无'}`);
+    } catch (error) {
+      Logger.Error(`[PlayerService] 封禁/解封玩家失败: uid=${uid}`, error as Error);
+      throw error;
+    }
   }
 
   /**
    * 踢出玩家
    */
   public async kickPlayer(uid: number, reason?: string): Promise<void> {
+    // 检查玩家是否在线
+    if (!OnlineTracker.Instance.IsOnline(uid)) {
+      Logger.Info(`[PlayerService] 玩家不在线，无需踢出: uid=${uid}`);
+      throw new Error('玩家不在线');
+    }
+    
     try {
-      const { OnlineTracker } = await import('../../GameServer/Game/Player/OnlineTracker');
-      
-      // 检查玩家是否在线
-      if (!OnlineTracker.Instance.IsOnline(uid)) {
-        throw new Error('玩家不在线');
-      }
-      
       // 获取玩家Session
       const session = OnlineTracker.Instance.GetPlayerSession(uid);
       if (!session) {
@@ -411,19 +584,11 @@ export class PlayerService {
         Logger.Info(`[PlayerService] 已关闭玩家Socket连接: uid=${uid}`);
       }
       
-      // 尝试从PlayerManager移除玩家实例（如果GameServer已启动）
-      try {
-        const { PlayerManager } = await import('../../GameServer/Game/Player/PlayerManager');
-        
-        // 检查PlayerManager是否已初始化（通过检查是否有在线玩家）
-        const player = PlayerManager.GetInstance().GetPlayer(uid);
-        if (player) {
-          await PlayerManager.GetInstance().RemovePlayer(uid);
-          Logger.Info(`[PlayerService] 已从PlayerManager移除玩家: uid=${uid}`);
-        }
-      } catch (pmError) {
-        // PlayerManager未初始化或访问失败，仅记录警告
-        Logger.Warn(`[PlayerService] 无法访问PlayerManager: ${(pmError as Error).message}`);
+      // 从PlayerManager移除玩家实例
+      const player = PlayerManager.GetInstance().GetPlayer(uid);
+      if (player) {
+        await PlayerManager.GetInstance().RemovePlayer(uid);
+        Logger.Info(`[PlayerService] 已从PlayerManager移除玩家: uid=${uid}`);
       }
       
       Logger.Info(`[PlayerService] 踢出玩家成功: uid=${uid}, reason=${reason || '无'}`);

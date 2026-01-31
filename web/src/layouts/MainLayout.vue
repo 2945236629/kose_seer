@@ -52,11 +52,6 @@
             <span class="text-sm">操作日志</span>
           </el-menu-item>
         </el-sub-menu>
-
-        <el-menu-item index="/demo">
-          <el-icon><Grid /></el-icon>
-          <span class="ml-2 font-medium">组件演示</span>
-        </el-menu-item>
       </el-menu>
     </aside>
     
