@@ -80,6 +80,11 @@ export const configApi = {
     }))
   },
 
+  // 获取性格列表
+  getNatures() {
+    return extractData(request.get('/api/config/natures'))
+  },
+
   // 健康检查
   checkHealth() {
     return extractData(request.get('/health'))

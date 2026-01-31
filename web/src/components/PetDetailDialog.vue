@@ -14,16 +14,24 @@
           <div class="card-header">
             <el-icon><InfoFilled /></el-icon>
             <span>基本信息</span>
-            <el-button 
-              v-if="!isEditing" 
-              size="small" 
-              type="primary" 
-              @click="startEdit"
-              style="margin-left: auto"
-            >
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
+            <div v-if="!isEditing" style="margin-left: auto; display: flex; gap: 8px;">
+              <el-button 
+                size="small" 
+                @click="handleRefresh"
+                :loading="refreshing"
+              >
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+              <el-button 
+                size="small" 
+                type="primary" 
+                @click="startEdit"
+              >
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+            </div>
             <div v-else style="margin-left: auto; display: flex; gap: 8px;">
               <el-button size="small" @click="cancelEdit">取消</el-button>
               <el-button size="small" type="primary" @click="saveEdit">保存</el-button>
@@ -463,7 +471,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { InfoFilled, TrendCharts, Promotion, Star, MagicStick, Edit, Warning } from '@element-plus/icons-vue'
+import { InfoFilled, TrendCharts, Promotion, Star, MagicStick, Edit, Warning, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useConfigStore } from '@/stores/config'
 import { configApi } from '@/api/config'
@@ -488,9 +496,55 @@ const configStore = useConfigStore()
 
 const visible = ref(props.modelValue)
 const isEditing = ref(false)
+const refreshing = ref(false)
 const skillFilterMode = ref<'current' | 'all'>('all')
 const selectedSkillId = ref<number>(0)
 const skillSelectKey = ref(0) // 用于强制刷新 PaginatedSelect
+
+// 性格选项（从后端加载）
+const natureOptions = ref<Array<{ id: number; name: string; category: string }>>([])
+
+// 加载性格选项
+const loadNatureOptions = async () => {
+  try {
+    const natures = await configApi.getNatures() as any
+    natureOptions.value = (natures.data || natures).map((nature: any) => ({
+      id: nature.id,
+      name: nature.name,
+      category: nature.desc || nature.category
+    }))
+  } catch (error) {
+    console.error('加载性格选项失败:', error)
+    // 使用默认值
+    natureOptions.value = [
+      { id: 0, name: '孤独', category: '攻击+ 防御-' },
+      { id: 1, name: '固执', category: '攻击+ 特攻-' },
+      { id: 2, name: '调皮', category: '攻击+ 特防-' },
+      { id: 3, name: '勇敢', category: '攻击+ 速度-' },
+      { id: 4, name: '大胆', category: '防御+ 攻击-' },
+      { id: 5, name: '顽皮', category: '防御+ 特攻-' },
+      { id: 6, name: '无虑', category: '防御+ 特防-' },
+      { id: 7, name: '悠闲', category: '防御+ 速度-' },
+      { id: 8, name: '保守', category: '特攻+ 攻击-' },
+      { id: 9, name: '稳重', category: '特攻+ 防御-' },
+      { id: 10, name: '马虎', category: '特攻+ 特防-' },
+      { id: 11, name: '冷静', category: '特攻+ 速度-' },
+      { id: 12, name: '沉着', category: '特防+ 攻击-' },
+      { id: 13, name: '温顺', category: '特防+ 防御-' },
+      { id: 14, name: '慎重', category: '特防+ 特攻-' },
+      { id: 15, name: '狂妄', category: '特防+ 速度-' },
+      { id: 16, name: '胆小', category: '速度+ 攻击-' },
+      { id: 17, name: '急躁', category: '速度+ 防御-' },
+      { id: 18, name: '开朗', category: '速度+ 特攻-' },
+      { id: 19, name: '天真', category: '速度+ 特防-' },
+      { id: 20, name: '害羞', category: '平衡发展' },
+      { id: 21, name: '实干', category: '平衡发展' },
+      { id: 22, name: '坦率', category: '平衡发展' },
+      { id: 23, name: '浮躁', category: '平衡发展' },
+      { id: 24, name: '认真', category: '平衡发展' }
+    ]
+  }
+}
 
 // 监听技能过滤模式变化，强制刷新选择器
 watch(skillFilterMode, () => {
@@ -498,35 +552,6 @@ watch(skillFilterMode, () => {
   selectedSkillId.value = 0
   skillSelectKey.value++ // 强制刷新 PaginatedSelect
 })
-
-// 性格选项
-const natureOptions = ref([
-  { id: 0, name: '勤奋', category: '平衡' },
-  { id: 1, name: '孤独', category: '攻击↑ 防御↓' },
-  { id: 2, name: '勇敢', category: '攻击↑ 速度↓' },
-  { id: 3, name: '固执', category: '攻击↑ 特攻↓' },
-  { id: 4, name: '调皮', category: '攻击↑ 特防↓' },
-  { id: 5, name: '大胆', category: '防御↑ 攻击↓' },
-  { id: 6, name: '坦率', category: '防御↑ 特攻↓' },
-  { id: 7, name: '悠闲', category: '防御↑ 速度↓' },
-  { id: 8, name: '淘气', category: '防御↑ 特防↓' },
-  { id: 9, name: '乐天', category: '特攻↑ 攻击↓' },
-  { id: 10, name: '胆小', category: '速度↑ 攻击↓' },
-  { id: 11, name: '急躁', category: '速度↑ 防御↓' },
-  { id: 12, name: '认真', category: '速度↑ 特攻↓' },
-  { id: 13, name: '爽朗', category: '速度↑ 特防↓' },
-  { id: 14, name: '天真', category: '速度↑ 特防↓' },
-  { id: 15, name: '内敛', category: '特攻↑ 攻击↓' },
-  { id: 16, name: '慢吞吞', category: '特攻↑ 速度↓' },
-  { id: 17, name: '冷静', category: '特攻↑ 速度↓' },
-  { id: 18, name: '温和', category: '特防↑ 攻击↓' },
-  { id: 19, name: '温顺', category: '特防↑ 防御↓' },
-  { id: 20, name: '马虎', category: '特防↑ 速度↓' },
-  { id: 21, name: '慎重', category: '特防↑ 速度↓' },
-  { id: 22, name: '浮躁', category: '特攻↑ 防御↓' },
-  { id: 23, name: '狂妄', category: '特攻↑ 特防↓' },
-  { id: 24, name: '沉着', category: '特防↑ 特攻↓' }
-])
 
 // 编辑表单
 const editForm = ref<any>({
@@ -561,15 +586,18 @@ watch(() => props.modelValue, (val) => {
   if (val) {
     isEditing.value = false
     selectedSkillId.value = 0
+    // 加载性格选项
+    loadNatureOptions()
   }
 })
 
 // 监听内部变化
 watch(visible, (val) => {
   emit('update:modelValue', val)
-  // 当对话框打开时加载技能名称
+  // 当对话框打开时加载技能名称和性格选项
   if (val) {
     configStore.fetchSkillNames()
+    loadNatureOptions()
   }
 })
 
@@ -815,6 +843,20 @@ const replaceSkill = (slotIndex: number) => {
   }
   
   ElMessage.success(`已替换技能${slotIndex + 1}`)
+}
+
+// 刷新精灵数据
+const handleRefresh = async () => {
+  refreshing.value = true
+  try {
+    emit('refresh')
+    ElMessage.success('数据已刷新')
+  } catch (error) {
+    console.error('刷新失败:', error)
+    ElMessage.error('刷新失败')
+  } finally {
+    refreshing.value = false
+  }
 }
 
 const handleClose = () => {

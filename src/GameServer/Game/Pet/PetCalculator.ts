@@ -144,8 +144,8 @@ export class PetCalculator {
     // 基础计算
     let stat = Math.floor((raceValue * 2 + dv + ev / 4) * level / 100) + 5;
 
-    // 应用性格修正
-    if (nature > 0 && nature <= 26) {
+    // 应用性格修正（性格ID范围：0-24）
+    if (nature >= 0 && nature <= 24) {
       // 映射属性名到 StatType
       const statTypeMap: { [key: string]: StatType } = {
         'atk': StatType.ATTACK,

@@ -155,6 +155,10 @@ export class PetService {
 
     const pet = petData.PetList[index];
     petData.PetList.splice(index, 1);
+    
+    // 立即保存到数据库（不等待自动保存）
+    await petData.save();
+    
     Logger.Info(`[PetService] 删除精灵成功: uid=${uid}, petId=${pet.petId}, catchTime=${catchTime}`);
   }
 
@@ -246,6 +250,9 @@ export class PetService {
       default:
         throw new Error(`不支持的字段: ${field}`);
     }
+
+    // 立即保存到数据库（不等待自动保存）
+    await petData.save();
 
     Logger.Info(`[PetService] 修改精灵属性成功: uid=${uid}, catchTime=${catchTime}, field=${field}, value=${value}`);
   }
@@ -383,6 +390,10 @@ export class PetService {
     } else {
       Logger.Info(`[PetService] 使用手动设置的属性值，跳过自动计算`);
     }
+
+    // 立即保存到数据库（不等待自动保存）
+    await petData.save();
+    Logger.Info(`[PetService] 精灵数据已立即保存到数据库`);
 
     Logger.Info(`[PetService] 批量修改精灵属性成功: uid=${uid}, catchTime=${updateData.catchTime}`);
   }

@@ -375,4 +375,16 @@ export class ConfigService {
     Logger.Info(`[ConfigService] 加载技能名字: ${Object.keys(nameMap).length} 个技能`);
     return nameMap;
   }
+
+  // 获取性格列表
+  public async getNatures(): Promise<any[]> {
+    const config = GameConfig.GetNatureConfig();
+    if (!config || !config.natures) {
+      Logger.Warn('[ConfigService] 性格配置未加载');
+      return [];
+    }
+
+    Logger.Info(`[ConfigService] 加载性格列表: ${config.natures.length} 种性格`);
+    return config.natures;
+  }
 }

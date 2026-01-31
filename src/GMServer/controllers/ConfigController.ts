@@ -198,4 +198,15 @@ export class ConfigController {
       res.status(500).json({ success: false, error: (error as Error).message });
     }
   };
+
+  // 获取性格列表
+  public getNatures = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const natures = await this.configService.getNatures();
+      res.json({ success: true, data: natures });
+    } catch (error) {
+      Logger.Error('[ConfigController] 获取性格列表失败', error as Error);
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  };
 }

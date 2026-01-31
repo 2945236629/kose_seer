@@ -328,16 +328,11 @@ export class PetManager extends BaseManager {
   }
 
   /**
-   * 重新计算属�?
+   * 重新计算属性
+   * 使用 PetCalculator 的正确计算方法，包含种族值和性格修正
    */
   private recalculateStats(pet: IPetInfo): void {
-    pet.maxHp = Math.floor(100 + pet.level * 5 + pet.dvHp + pet.evHp / 4);
-    pet.atk = Math.floor(50 + pet.level * 2 + pet.dvAtk + pet.evAtk / 4);
-    pet.def = Math.floor(50 + pet.level * 2 + pet.dvDef + pet.evDef / 4);
-    pet.spAtk = Math.floor(50 + pet.level * 2 + pet.dvSpAtk + pet.evSpAtk / 4);
-    pet.spDef = Math.floor(50 + pet.level * 2 + pet.dvSpDef + pet.evSpDef / 4);
-    pet.speed = Math.floor(50 + pet.level * 2 + pet.dvSpeed + pet.evSpeed / 4);
-    pet.hp = pet.maxHp;
+    PetCalculator.UpdatePetStats(pet);
   }
 
   /**

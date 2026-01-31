@@ -19,6 +19,9 @@ configRouter.get('/task-names', configController.getTaskNames);
 // 获取技能名字映射
 configRouter.get('/skill-names', configController.getSkillNames);
 
+// 获取性格列表
+configRouter.get('/natures', configController.getNatures);
+
 // 搜索精灵选项（分页）
 configRouter.get('/search/pets', configController.searchPets);
 
