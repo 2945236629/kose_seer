@@ -20,7 +20,7 @@ interface ISkillXmlData {
         CritRate?: number;
         Priority?: number;
         MustHit?: number;
-        SideEffect?: number;
+        SideEffect?: number | string;  // 支持单效果和多效果
         SideEffectArg?: string;
       }>;
     };

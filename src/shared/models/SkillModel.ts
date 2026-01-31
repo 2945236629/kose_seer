@@ -44,7 +44,7 @@ export interface ISkillConfig {
   critRate: number;
   priority: number;
   mustHit: boolean;
-  sideEffect?: number;
+  sideEffect?: number | string;     // 支持单效果(数字)和多效果(字符串)
   sideEffectArg?: string;
   
   // 特殊暴击条件

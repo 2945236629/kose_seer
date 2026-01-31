@@ -3,6 +3,10 @@
  * 负责在战斗中触发和应用技能效果
  * 
  * 集成效果系统到战斗流程
+ * 
+ * 支持多效果技能：
+ * - 单效果: SideEffect="4", SideEffectArg="0 100 1"
+ * - 多效果: SideEffect="4 4 4", SideEffectArg="0 100 1 1 100 1 2 100 1"
  */
 
 import { Logger } from '../../../shared/utils';
@@ -13,12 +17,32 @@ import { EffectTiming, createEffectContext, IEffectResult } from './effects/core
 import { SkillEffectConfig } from '../../../shared/config/game/SkillEffectConfig';
 
 /**
+ * 效果参数数量映射
+ * 根据客户端 Effect_X.as 中的 _argsNum 定义
+ */
+const EFFECT_ARGS_NUM_MAP: Record<number, number> = {
+  // 能力变化类 (3个参数: 能力索引, 触发概率, 等级变化)
+  4: 3,   // Effect_4: 自身能力等级变化
+  5: 3,   // Effect_5: 对方能力等级变化
+  
+  // 状态类 (1个参数: 触发概率)
+  11: 1,  // Effect_11: 中毒
+  12: 1,  // Effect_12: 烧伤
+  14: 1,  // Effect_14: 冻伤
+  
+  // 吸取类 (1个参数: 回合数)
+  13: 1,  // Effect_13: 吸取
+  
+  // 默认: 无参数
+};
+
+/**
  * 效果触发器类
  */
 export class EffectTrigger {
 
   /**
-   * 触发技能附加效果
+   * 触发技能的所有附加效果（支持多效果）
    * 
    * @param skill 技能配置
    * @param attacker 攻击方
@@ -39,13 +63,45 @@ export class EffectTrigger {
       return [];
     }
 
+    // 检查是否为多效果技能
+    const sideEffectStr = skill.sideEffect.toString();
+    if (sideEffectStr.includes(' ')) {
+      // 多效果技能
+      return this.TriggerMultipleSkillEffects(skill, attacker, defender, damage, timing);
+    } else {
+      // 单效果技能
+      return this.TriggerSingleSkillEffect(skill, attacker, defender, damage, timing);
+    }
+  }
+
+  /**
+   * 触发单个技能效果
+   * 
+   * @param skill 技能配置
+   * @param attacker 攻击方
+   * @param defender 防守方
+   * @param damage 造成的伤害
+   * @param timing 触发时机
+   * @returns 效果结果数组
+   */
+  private static TriggerSingleSkillEffect(
+    skill: ISkillConfig,
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    damage: number,
+    timing: EffectTiming
+  ): IEffectResult[] {
     const results: IEffectResult[] = [];
 
     try {
+      const effectId = typeof skill.sideEffect === 'number' 
+        ? skill.sideEffect 
+        : parseInt(skill.sideEffect.toString());
+
       // 1. 从配置获取效果信息
-      const effectConfig = SkillEffectConfig.GetEffect(skill.sideEffect);
+      const effectConfig = SkillEffectConfig.GetEffect(effectId);
       if (!effectConfig) {
-        Logger.Warn(`[EffectTrigger] 效果配置不存在: effectId=${skill.sideEffect}`);
+        Logger.Warn(`[EffectTrigger] 效果配置不存在: effectId=${effectId}`);
         return [];
       }
 
@@ -66,7 +122,7 @@ export class EffectTrigger {
 
       // 5. 创建效果上下文
       const context = createEffectContext(attacker, defender, skill.id, damage, timing);
-      context.effectId = skill.sideEffect;
+      context.effectId = effectId;
       context.effectArgs = effectArgs;
       context.skillType = skill.type;
       context.skillCategory = skill.category;
@@ -78,17 +134,136 @@ export class EffectTrigger {
 
       // 7. 记录日志
       if (effectResults.length > 0) {
-        Logger.Info(
+        Logger.Debug(
           `[EffectTrigger] 触发效果: ${effect.getEffectName()} (Eid=${effectConfig.eid}), ` +
           `结果数: ${effectResults.length}`
         );
       }
 
     } catch (error) {
-      Logger.Error(`[EffectTrigger] 效果执行失败: ${error}`);
+      Logger.Error(`[EffectTrigger] 单效果执行失败: ${error}`);
     }
 
     return results;
+  }
+
+  /**
+   * 触发多个技能效果
+   * 
+   * 示例：
+   * SideEffect="4 4 4 4 4 4"
+   * SideEffectArg="0 100 1 1 100 1 2 100 1 3 100 1 4 100 1 5 100 1"
+   * 
+   * @param skill 技能配置
+   * @param attacker 攻击方
+   * @param defender 防守方
+   * @param damage 造成的伤害
+   * @param timing 触发时机
+   * @returns 效果结果数组
+   */
+  private static TriggerMultipleSkillEffects(
+    skill: ISkillConfig,
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    damage: number,
+    timing: EffectTiming
+  ): IEffectResult[] {
+    const allResults: IEffectResult[] = [];
+
+    try {
+      // 1. 解析多个效果ID
+      const sideEffectStr = skill.sideEffect.toString();
+      const effectIds = sideEffectStr.split(' ').map(id => parseInt(id.trim())).filter(id => id > 0);
+      
+      if (effectIds.length === 0) {
+        return [];
+      }
+
+      // 2. 解析所有参数
+      const allArgs = this.ParseEffectArgs(skill.sideEffectArg || '');
+      
+      Logger.Debug(
+        `[EffectTrigger] 多效果技能: ${skill.name} (ID=${skill.id}), ` +
+        `效果数: ${effectIds.length}, 参数数: ${allArgs.length}`
+      );
+
+      // 3. 按顺序处理每个效果
+      let argIndex = 0;
+      
+      for (let i = 0; i < effectIds.length; i++) {
+        const effectId = effectIds[i];
+        
+        // 获取效果配置
+        const effectConfig = SkillEffectConfig.GetEffect(effectId);
+        if (!effectConfig) {
+          Logger.Warn(`[EffectTrigger] 效果配置不存在: effectId=${effectId}`);
+          continue;
+        }
+
+        // 获取效果实例
+        const effect = EffectRegistry.getInstance().getEffect(effectConfig.eid);
+        if (!effect) {
+          Logger.Warn(`[EffectTrigger] 效果未注册: eid=${effectConfig.eid}`);
+          continue;
+        }
+
+        // 检查触发时机
+        if (!effect.canTrigger(timing)) {
+          continue;
+        }
+
+        // 获取该效果需要的参数数量
+        const argsNum = this.GetEffectArgsNum(effectConfig.eid);
+        
+        // 提取该效果的参数
+        const effectArgs = allArgs.slice(argIndex, argIndex + argsNum);
+        argIndex += argsNum;
+
+        Logger.Debug(
+          `[EffectTrigger] 效果 ${i + 1}/${effectIds.length}: ` +
+          `Eid=${effectConfig.eid}, 参数=${effectArgs.join(' ')}`
+        );
+
+        // 创建效果上下文
+        const context = createEffectContext(attacker, defender, skill.id, damage, timing);
+        context.effectId = effectId;
+        context.effectArgs = effectArgs;
+        context.skillType = skill.type;
+        context.skillCategory = skill.category;
+        context.skillPower = skill.power;
+
+        // 执行效果
+        const effectResults = effect.execute(context);
+        allResults.push(...effectResults);
+
+        if (effectResults.length > 0) {
+          Logger.Debug(
+            `[EffectTrigger] 效果执行成功: ${effect.getEffectName()}, ` +
+            `结果数: ${effectResults.length}`
+          );
+        }
+      }
+
+      Logger.Info(
+        `[EffectTrigger] 多效果技能执行完成: ${skill.name}, ` +
+        `总结果数: ${allResults.length}`
+      );
+
+    } catch (error) {
+      Logger.Error(`[EffectTrigger] 多效果执行失败: ${error}`);
+    }
+
+    return allResults;
+  }
+
+  /**
+   * 获取效果需要的参数数量
+   * 
+   * @param eid 效果类型ID
+   * @returns 参数数量
+   */
+  private static GetEffectArgsNum(eid: number): number {
+    return EFFECT_ARGS_NUM_MAP[eid] || 0;
   }
 
   /**

@@ -38,8 +38,6 @@ echo.
 pause
 
 echo [启动] ProxyServer 代理服务...
-echo 客户端连接端口: 9999
-echo Web 调试界面: http://localhost:9000
 echo.
 echo 功能: 协议抓包、数据包分析
 echo.
