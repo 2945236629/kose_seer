@@ -1,6 +1,7 @@
 import { ConfigRegistry } from '../../../shared/config/ConfigRegistry';
 import { ConfigKeys } from '../../../shared/config/ConfigDefinitions';
 import { Logger } from '../../../shared/utils';
+import { SkillEffectsConfig } from './SkillEffectsConfig';
 import {
   IPetXmlConfig,
   IPetMonster,
@@ -179,6 +180,92 @@ export class GameConfig {
    */
   public static GetDefaultPlayerConfig(): IDefaultPlayerConfig | null {
     return ConfigRegistry.Instance.Get<IDefaultPlayerConfig>(ConfigKeys.DEFAULT_PLAYER);
+  }
+
+  /**
+   * 获取已实现的效果（从V2配置）
+   * 注意：此方法已废弃，请使用 SkillEffectsConfig.Instance.GetImplementedEffects()
+   */
+  public static GetImplementedEffects(): any[] {
+    return SkillEffectsConfig.Instance.GetImplementedEffects();
+  }
+
+  /**
+   * 获取未实现的效果（从V2配置）
+   */
+  public static GetUnimplementedEffects(): any[] {
+    return SkillEffectsConfig.Instance.GetUnimplementedEffects();
+  }
+
+  /**
+   * 按分类获取效果（从V2配置）
+   * @param category 效果分类
+   */
+  public static GetEffectsByCategory(category: string): any[] {
+    return SkillEffectsConfig.Instance.GetAllEffects().filter((e: any) => e.category === category);
+  }
+
+  // ============ 向后兼容的方法（已废弃，使用V2配置） ============
+
+  /**
+   * @deprecated 使用 GetEffectById 代替
+   * 获取基础效果配置
+   * @param eid 基础效果ID (1-41)
+   */
+  public static GetBaseEffect(eid: number): any | null {
+    return this.GetEffectById(eid);
+  }
+
+  /**
+   * @deprecated 使用 GetAllEffectsV2 代替
+   * 获取所有基础效果
+   */
+  public static GetAllBaseEffects(): any[] {
+    const { SkillEffectsConfig } = require('./SkillEffectsConfig');
+    return SkillEffectsConfig.Instance.GetAllEffects().filter((e: any) => e.effectId >= 1 && e.effectId <= 41);
+  }
+
+  /**
+   * @deprecated 使用 GetEffectById 代替
+   * 获取扩展效果配置
+   * @param effectId 扩展效果ID (1-1901)
+   */
+  public static GetExtendedEffect(effectId: number): any | null {
+    return this.GetEffectById(effectId);
+  }
+
+  /**
+   * @deprecated 使用 GetAllEffectsV2 代替
+   * 获取所有扩展效果
+   */
+  public static GetAllExtendedEffects(): any[] {
+    return this.GetAllEffectsV2();
+  }
+
+  /**
+   * @deprecated 使用 GetImplementedEffects 代替
+   * 获取已实现的扩展效果
+   */
+  public static GetImplementedExtendedEffects(): any[] {
+    return this.GetImplementedEffects();
+  }
+
+  /**
+   * @deprecated 使用 GetUnimplementedEffects 代替
+   * 获取未实现的扩展效果
+   */
+  public static GetUnimplementedExtendedEffects(): any[] {
+    return this.GetUnimplementedEffects();
+  }
+
+  /**
+   * @deprecated 使用 GetEffectsByCategory 或自行过滤
+   * 按映射类型获取扩展效果
+   * @param mappingType 映射类型 ('new' | 'base' | 'ignore')
+   */
+  public static GetExtendedEffectsByMappingType(mappingType: string): any[] {
+    const { SkillEffectsConfig } = require('./SkillEffectsConfig');
+    return SkillEffectsConfig.Instance.GetAllEffects().filter((e: any) => e.mappingType === mappingType);
   }
 
   /**
@@ -390,5 +477,31 @@ export class GameConfig {
    */
   public static GetStats() {
     return ConfigRegistry.Instance.GetStats();
+  }
+
+  /**
+   * 获取技能效果V2配置（通过SkillEffectsConfig）
+   * @param effectId 效果ID
+   */
+  public static GetEffectById(effectId: number): any | null {
+    // 动态导入SkillEffectsConfig以避免循环依赖
+    const { SkillEffectsConfig } = require('./SkillEffectsConfig');
+    return SkillEffectsConfig.Instance.GetEffectById(effectId);
+  }
+
+  /**
+   * 获取所有技能效果V2配置
+   */
+  public static GetAllEffectsV2(): any[] {
+    const { SkillEffectsConfig } = require('./SkillEffectsConfig');
+    return SkillEffectsConfig.Instance.GetAllEffects();
+  }
+
+  /**
+   * 重新加载技能效果V2配置
+   */
+  public static async ReloadSkillEffectsV2(): Promise<void> {
+    const { SkillEffectsConfig } = require('./SkillEffectsConfig');
+    await SkillEffectsConfig.Instance.Reload();
   }
 }

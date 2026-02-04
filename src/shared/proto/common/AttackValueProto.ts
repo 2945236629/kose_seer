@@ -5,20 +5,35 @@ import { BufferWriter } from '../../utils';
  * 攻击结果信息
  * 对应前端: com.robot.core.info.fightInfo.attack.AttackValue
  * 用于 NOTE_USE_SKILL (2505) 中的攻击信息
+ * 
+ * 重要说明：
+ * - userId: 攻击者ID
+ * - lostHP: 被攻击者失去的HP（伤害值）
+ * - gainHP: 攻击者获得的HP（吸血等效果，可为负数表示反伤）
+ * - remainHp: 攻击者剩余HP（客户端用此字段更新攻击者的HP条）
+ * - maxHp: 攻击者的最大HP
+ * - skillList: 攻击者的技能列表
+ * 
+ * 客户端逻辑：
+ * - LOST_HP 事件：更新被攻击者（enemy）的HP，扣除 lostHP
+ * - GAIN_HP 事件：更新攻击者（this）的HP，增加 gainHP
+ * - REMAIN_HP 事件：更新攻击者（this）的HP，设置为 remainHp
+ * - 客户端计算 changeHp = remainHp - currentHp 来显示HP变化动画
+ * - 如果 gainHP != 0，客户端会在攻击者身上显示回血/反伤动画
  */
 export class AttackValueProto extends BaseProto {
   userId: number = 0;          // 攻击者ID
   skillId: number = 0;         // 技能ID
   atkTimes: number = 1;        // 攻击次数
-  lostHP: number = 0;          // 损失HP
-  gainHP: number = 0;          // 回复HP (可为负数)
-  remainHp: number = 0;        // 剩余HP (可为负数)
-  maxHp: number = 0;           // 最大HP
+  lostHP: number = 0;          // 被攻击者损失的HP（伤害值）
+  gainHP: number = 0;          // 攻击者回复的HP（吸血等，可为负数表示反伤）
+  remainHp: number = 0;        // 攻击者剩余HP（客户端用于更新攻击者HP条）
+  maxHp: number = 0;           // 攻击者最大HP
   state: number = 0;           // 状态 (0=正常, 1=未命中/格挡)
-  skillList: Array<{ id: number; pp: number }> = []; // 技能列表
+  skillList: Array<{ id: number; pp: number }> = []; // 攻击者技能列表
   isCrit: number = 0;          // 是否暴击 (0/1)
-  status: number[] = new Array(20).fill(0);  // 状态数组 (20字节)
-  battleLv: number[] = new Array(6).fill(0); // 战斗等级 (6字节)
+  status: number[] = new Array(20).fill(0);  // 攻击者状态数组 (20字节)
+  battleLv: number[] = new Array(6).fill(0); // 攻击者战斗等级 (6字节)
   maxShield: number = 0;       // 最大护盾
   curShield: number = 0;       // 当前护盾
   petType: number = 0;         // 精灵类型

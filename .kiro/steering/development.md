@@ -1,5 +1,37 @@
 # Development Guide
 
+## 代码规范
+
+### Import 规范
+
+**禁止使用动态 import**
+
+❌ 错误示例：
+```typescript
+const { PacketPetOneCure } = await import('../../Server/Packet/Send/Pet/PacketPetOneCure');
+await this.Player.SendPacket(new PacketPetOneCure(catchTime, hp, maxHp));
+```
+
+✅ 正确示例：
+```typescript
+// 在文件开头导入
+import { PacketPetOneCure } from '../../Server/Packet/Send/Pet/PacketPetOneCure';
+
+// 在方法中使用
+await this.Player.SendPacket(new PacketPetOneCure(catchTime, hp, maxHp));
+```
+
+**原因：**
+- 动态 import 增加运行时开销
+- 影响 TypeScript 类型检查
+- 降低代码可读性和可维护性
+- 所有依赖应该在编译时确定
+
+**规则：**
+- 所有 import 语句必须写在文件开头
+- 禁止在方法内使用 `import()` 或 `require()`
+- 使用静态 import 确保类型安全
+
 ## Configuration Loading
 
 ### Server Configuration

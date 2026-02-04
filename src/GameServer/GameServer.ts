@@ -175,6 +175,16 @@ export class GameServer {
     Logger.Info('[GameServer] 初始化配置系统...');
     await ConfigRegistry.Instance.Initialize();
 
+    // 2.5. 加载技能效果配置（原子效果系统）
+    Logger.Info('[GameServer] 加载技能效果配置...');
+    const { SkillEffectsConfig } = await import('../shared/config/game/SkillEffectsConfig');
+    await SkillEffectsConfig.Instance.Load();
+    const effectStats = SkillEffectsConfig.Instance.GetStats();
+    Logger.Info(
+      `[GameServer] 技能效果配置加载完成: ${effectStats.total} 个效果 ` +
+      `(已实现: ${effectStats.implemented}, 未实现: ${effectStats.unimplemented})`
+    );
+
     // 3. 初始化数据库
     Logger.Info('[GameServer] 初始化数据库...');
     await DatabaseManager.Instance.Initialize();

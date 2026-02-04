@@ -25,6 +25,8 @@ import { IUpdatePropInfo } from '../../../shared/proto/packets/rsp/pet/NoteUpdat
 import { IUpdateSkillInfo } from '../../../shared/proto/packets/rsp/pet/NoteUpdateSkillRspProto';
 import { SptSystem } from './SptSystem';
 import { PetCalculator } from './PetCalculator';
+import { GameConfig } from '../../../shared/config/game/GameConfig';
+import { PacketPetOneCure } from '../../Server/Packet/Send/Pet/PacketPetOneCure';
 
 /**
  * 精灵管理器
@@ -448,11 +450,15 @@ export class PetManager extends BaseManager {
     proto.ev_sd = pet.evSpDef;
     proto.ev_sp = pet.evSpeed;
     
-    proto.skills = pet.skillArray.map(skillId => ({
-      id: skillId,
-      pp: 20,
-      maxPp: 20
-    }));
+    proto.skills = pet.skillArray.map(skillId => {
+      const skillConfig = GameConfig.GetSkillById(skillId);
+      const maxPP = skillConfig?.MaxPP || 20;
+      return {
+        id: skillId,
+        pp: maxPP,      // 当前PP（满值）
+        maxPp: maxPP    // 最大PP
+      };
+    });
     
     proto.catchTime = pet.catchTime;
     proto.catchMap = 0;
@@ -804,6 +810,73 @@ export class PetManager extends BaseManager {
     } catch (error) {
       Logger.Error(`[PetManager] HandleSkillSwitch failed`, error as Error);
       await this.Player.SendPacket(new PacketEmpty(CommandID.PET_SKILL_SWICTH).setResult(5000));
+    }
+  }
+
+  /**
+   * 处理恢复单个精灵HP
+   * CMD 2310: PET_ONE_CURE
+   * 
+   * 功能：
+   * - 恢复精灵HP到满值
+   * - 非VIP用户扣除20赛尔豆
+   * - VIP用户免费
+   * 
+   * 注意：客户端会自动恢复技能PP，服务器端不需要处理
+   */
+  public async HandlePetOneCure(catchTime: number, clientCoins: number = 0): Promise<void> {
+    try {
+      Logger.Debug(`[PetManager] HandlePetOneCure: UserID=${this.UserID}, CatchTime=${catchTime}`);
+      Logger.Debug(`[PetManager] 当前精灵列表: ${JSON.stringify(this.PetData.PetList.map(p => ({ petId: p.petId, catchTime: p.catchTime, hp: p.hp })))}`);
+
+      // 1. 查找精灵
+      const pet = this.PetData.GetPetByCatchTime(catchTime);
+      
+      if (!pet) {
+        Logger.Warn(`[PetManager] 精灵不存在: UserID=${this.UserID}, CatchTime=${catchTime}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.PET_ONE_CURE).setResult(5001));
+        return;
+      }
+
+      Logger.Debug(`[PetManager] 找到精灵: PetId=${pet.petId}, HP=${pet.hp}/${pet.maxHp}`);
+
+      // 2. 检查是否需要恢复
+      if (pet.hp >= pet.maxHp) {
+        Logger.Debug(`[PetManager] 精灵HP已满: UserID=${this.UserID}, PetId=${pet.petId}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.PET_ONE_CURE).setResult(5002));
+        return;
+      }
+
+      // 3. 计算费用（非VIP用户需要支付20赛尔豆）
+      const isVip = this.Player.Data.vip > 0; // 假设vip字段表示VIP状态
+      const cost = isVip ? 0 : 20;
+
+      // 4. 检查赛尔豆是否足够
+      if (!isVip && this.Player.Data.coins < cost) {
+        Logger.Warn(`[PetManager] 赛尔豆不足: UserID=${this.UserID}, 需要=${cost}, 拥有=${this.Player.Data.coins}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.PET_ONE_CURE).setResult(10016)); // 10016: 赛尔豆不足
+        return;
+      }
+
+      // 5. 扣除赛尔豆（非VIP）
+      if (!isVip) {
+        this.Player.Data.coins -= cost;
+      }
+
+      // 6. 恢复HP到满值
+      pet.hp = pet.maxHp;
+
+      Logger.Info(
+        `[PetManager] 恢复精灵HP: UserID=${this.UserID}, PetId=${pet.petId}, ` +
+        `HP=${pet.hp}/${pet.maxHp}, 消耗赛尔豆=${cost}, 剩余=${this.Player.Data.coins}, ` +
+        `VIP=${isVip}, CatchTime=${catchTime}`
+      );
+
+      // 7. 发送成功响应（只发送catchTime，客户端会在本地更新HP和PP）
+      await this.Player.SendPacket(new PacketPetOneCure(catchTime));
+    } catch (error) {
+      Logger.Error(`[PetManager] HandlePetOneCure failed`, error as Error);
+      await this.Player.SendPacket(new PacketEmpty(CommandID.PET_ONE_CURE).setResult(5000));
     }
   }
 }

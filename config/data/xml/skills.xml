@@ -50,7 +50,7 @@
         <Move ID="10027" Name="高压水枪" Category="2" Type="2" Power="120" MaxPP="10" Accuracy="85" Url="water_3" CD="750"/>
         <Move ID="10028" Name="音速拳" Category="1" Type="8" Power="45" MaxPP="30" Accuracy="100" Priority="1" Url="normal_1" CD="541"/>
         <Move ID="10029" Name="疯狂乱抓" Category="1" Type="8" Power="25" MaxPP="15" Accuracy="85" SideEffect="31" SideEffectArg="2 5" Url="normal_1" CD="375"/>
-        <Move ID="10030" Name="火焰车" Category="1" Type="3" Power="95" MaxPP="25" Accuracy="100" SideEffect="12" SideEffectArg="10" Url="fire_2" CD="41"/>
+        <Move ID="10030" Name="火焰车" Category="1" Type="3" Power="95" MaxPP="25" Accuracy="100" SideEffect="12" SideEffectArg="90" Url="fire_2" CD="41"/>
         <Move ID="10031" Name="佯攻" Category="1" Type="8" Power="60" MaxPP="10" Accuracy="100" Priority="2" Url="normal_2" CD="625"/>
         <Move ID="10032" Name="惩罚" Category="1" Type="8" Power="60" MaxPP="10" Accuracy="100" SideEffect="35" Url="normal_2" CD="666"/>
         <Move ID="10033" Name="全力一击" Category="1" Type="8" Power="120" MaxPP="5" Accuracy="100" Url="normal_3" CD="1500"/>

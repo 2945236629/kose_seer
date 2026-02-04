@@ -18,7 +18,7 @@ export interface ISkillInfo {
   priority: number;        // 优先度
   mustHit: boolean;        // 是否必中
   sideEffect?: number;     // 副作用ID
-  sideEffectArg?: string;  // 副作用参数
+  sideEffectArg?: string | number;  // 副作用参数（支持字符串和数字）
 }
 
 /**
@@ -45,7 +45,7 @@ export interface ISkillConfig {
   priority: number;
   mustHit: boolean;
   sideEffect?: number | string;     // 支持单效果(数字)和多效果(字符串)
-  sideEffectArg?: string;
+  sideEffectArg?: string | number;  // 副作用参数（支持字符串和数字）
   
   // 特殊暴击条件
   critAtkFirst?: boolean;    // 先出手必暴击

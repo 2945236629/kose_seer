@@ -2,6 +2,8 @@ import { Logger } from '../../../../shared/utils';
 import { PlayerInstance } from '../../Player/PlayerInstance';
 import { IBattleInfo, IBattlePet, BattleStatus } from '../../../../shared/models/BattleModel';
 import { GameConfig } from '../../../../shared/config/game/GameConfig';
+import { createBattlePetProxy } from '../BattlePetProxy';
+import { SptSystem } from '../../Pet/SptSystem';
 
 /**
  * 战斗初始化服务
@@ -19,13 +21,17 @@ export class BattleInitService {
    */
   public async CreatePVEBattle(userId: number, enemyId: number, enemyLevel: number): Promise<IBattleInfo | null> {
     try {
-      // 1. 获取玩家首发精灵
+      // 1. 获取玩家首发精灵（必须是健康的）
       const playerPets = this._player.PetManager.PetData.GetPetsInBag();
-      const playerPet = playerPets.find(p => p.isDefault) || playerPets[0];
-      if (!playerPet) {
-        Logger.Warn(`[BattleInitService] 玩家没有首发精灵: UserID=${userId}`);
+      const healthyPets = playerPets.filter(p => p.hp > 0);
+      
+      if (healthyPets.length === 0) {
+        Logger.Warn(`[BattleInitService] 玩家没有健康的精灵: UserID=${userId}`);
         return null;
       }
+      
+      // 优先选择首发精灵，如果首发精灵死亡则选择第一个健康的精灵
+      const playerPet = healthyPets.find(p => p.isDefault) || healthyPets[0];
 
       // 2. 从配置获取玩家精灵的类型
       const playerPetConfig = GameConfig.GetPetById(playerPet.petId);
@@ -53,7 +59,8 @@ export class BattleInitService {
         playerPet.speed,
         playerType,
         playerSkills,
-        playerPet.catchTime
+        playerPet.catchTime,
+        0  // 皮肤ID（暂时使用默认皮肤0）
       );
 
       // 4. 从配置获取敌人精灵信息
@@ -85,7 +92,8 @@ export class BattleInitService {
         enemyStats.speed,
         enemyPetConfig.Type || 0,
         enemySkills,
-        0
+        0,  // 敌人没有catchTime
+        0   // 敌人没有皮肤
       );
 
       // 6. 创建战斗实例
@@ -124,13 +132,24 @@ export class BattleInitService {
     speed: number,
     type: number,
     skills: number[],
-    catchTime: number
+    catchTime: number,
+    skinID: number = 0
   ): IBattlePet {
     // 过滤无效技能，但确保至少有一个技能
     const validSkills = skills.filter(s => s > 0);
     const finalSkills = validSkills.length > 0 ? validSkills : [10001]; // 默认撞击
     
-    return {
+    // 从技能配置中获取每个技能的最大PP
+    const skillPPs = finalSkills.map(skillId => {
+      const skillConfig = GameConfig.GetSkillById(skillId);
+      const maxPP = skillConfig?.MaxPP || 20;
+      Logger.Debug(`[BattleInitService] BuildBattlePet: SkillId=${skillId}, MaxPP=${maxPP}, SkillName=${skillConfig?.Name || 'Unknown'}`);
+      return maxPP;
+    });
+    
+    Logger.Debug(`[BattleInitService] BuildBattlePet: Skills=${JSON.stringify(finalSkills)}, PPs=${JSON.stringify(skillPPs)}`);
+    
+    const pet: IBattlePet = {
       petId: id,
       id,
       name,
@@ -145,10 +164,12 @@ export class BattleInitService {
       type,
       skills: finalSkills,
       catchTime,
+      skinID,  // 设置皮肤ID
       statusArray: new Array(20).fill(0),
       battleLv: new Array(6).fill(0),
       status: BattleStatus.NONE,
       statusTurns: 0,
+      statusDurations: new Array(20).fill(0),
       flinched: false,
       bound: false,
       boundTurns: 0,
@@ -156,11 +177,14 @@ export class BattleInitService {
       fatigueTurns: 0,
       battleLevels: [0, 0, 0, 0, 0, 0],
       effectCounters: {},
-      skillPP: finalSkills.map(() => 20),
+      skillPP: skillPPs,  // 使用从配置读取的PP值
       lastMove: 0,
       encore: false,
       encoreTurns: 0
     };
+
+    // 使用 Proxy 包装，自动同步状态字段
+    return createBattlePetProxy(pet);
   }
 
   /**
@@ -202,27 +226,47 @@ export class BattleInitService {
 
   /**
    * 获取敌人技能列表
-   * 从配置读取该精灵在指定等级可学会的技能
+   * 从配置读取该精灵在指定等级可学会的技能，随机选择4个
    */
   private GetEnemySkills(petId: number, level: number): number[] {
-    // TODO: 从技能配置读取该精灵的可学技能
-    // 暂时返回基础技能
-    const skills = [10001]; // 撞击
+    // 使用 SptSystem 获取精灵的可学习技能
+    const learnableMoves = SptSystem.GetLearnableMovesByLevel(petId, level);
 
-    if (level >= 5) skills.push(10002);  // 叫声
-    if (level >= 10) skills.push(10006); // 抓
-    if (level >= 15) skills.push(20004); // 火花
+    if (learnableMoves.length === 0) {
+      return [10001]; // 默认撞击
+    }
 
-    return skills.slice(0, 4); // 最多4个技能
+    // 如果技能数量 <= 4，直接返回所有技能
+    if (learnableMoves.length <= 4) {
+      return learnableMoves.map(move => move.id);
+    }
+
+    // 随机选择4个技能
+    const shuffled = [...learnableMoves].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 4).map(move => move.id);
   }
 
   /**
    * 验证战斗是否有效
    */
   public ValidateBattle(battle: IBattleInfo | null): boolean {
-    if (!battle) return false;
-    if (battle.isOver) return false;
-    if (battle.player.hp <= 0 || battle.enemy.hp <= 0) return false;
+    if (!battle) {
+      Logger.Debug(`[BattleInitService] ValidateBattle: battle is null`);
+      return false;
+    }
+    if (battle.isOver) {
+      Logger.Debug(`[BattleInitService] ValidateBattle: battle.isOver = true`);
+      return false;
+    }
+    if (battle.player.hp <= 0) {
+      Logger.Debug(`[BattleInitService] ValidateBattle: player.hp = ${battle.player.hp}`);
+      return false;
+    }
+    if (battle.enemy.hp <= 0) {
+      Logger.Debug(`[BattleInitService] ValidateBattle: enemy.hp = ${battle.enemy.hp}`);
+      return false;
+    }
+    Logger.Debug(`[BattleInitService] ValidateBattle: 战斗有效`);
     return true;
   }
 }

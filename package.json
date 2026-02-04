@@ -21,7 +21,8 @@
     "release:win": "node scripts/build.js win",
     "release:linux": "node scripts/build.js linux",
     "release:macos": "node scripts/build.js macos",
-    "release:all": "node scripts/build.js all"
+    "release:all": "node scripts/build.js all",
+    "generate:effects": "node scripts/generate-effect-config.js"
   },
   "pkg": {
     "scripts": "dist/**/*.js",

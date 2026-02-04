@@ -21,7 +21,10 @@ export class BattleTurnService {
    * 执行一个战斗回合
    */
   public ExecuteTurn(battle: IBattleInfo, playerSkillId: number): ITurnResult {
-    Logger.Info(`[BattleTurnService] 回合 ${battle.turn + 1}: 玩家使用技能 ${playerSkillId}`);
+    // 增加回合数
+    battle.turn++;
+    
+    Logger.Info(`[BattleTurnService] 回合 ${battle.turn}: 玩家使用技能 ${playerSkillId}`);
 
     // 获取技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
@@ -41,10 +44,15 @@ export class BattleTurnService {
           accuracy: skillMove.Accuracy,
           critRate: skillMove.CritRate || 1,
           priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1
+          mustHit: skillMove.MustHit === 1,
+          sideEffect: skillMove.SideEffect,
+          sideEffectArg: skillMove.SideEffectArg
         };
         skillConfigs.set(skillId, skillConfig);
-        Logger.Debug(`[BattleTurnService] 加载玩家技能: ${skillId} - ${skillConfig.name}`);
+        Logger.Debug(
+          `[BattleTurnService] 加载玩家技能: ${skillId} - ${skillConfig.name}, ` +
+          `副作用=${skillConfig.sideEffect || '无'}`
+        );
       }
     }
     
@@ -63,10 +71,15 @@ export class BattleTurnService {
           accuracy: skillMove.Accuracy,
           critRate: skillMove.CritRate || 1,
           priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1
+          mustHit: skillMove.MustHit === 1,
+          sideEffect: skillMove.SideEffect,
+          sideEffectArg: skillMove.SideEffectArg
         };
         skillConfigs.set(skillId, skillConfig);
-        Logger.Debug(`[BattleTurnService] 加载敌人技能: ${skillId} - ${skillConfig.name}`);
+        Logger.Debug(
+          `[BattleTurnService] 加载敌人技能: ${skillId} - ${skillConfig.name}, ` +
+          `副作用=${skillConfig.sideEffect || '无'}`
+        );
       }
     }
 
@@ -80,9 +93,6 @@ export class BattleTurnService {
    */
   public ExecuteEnemyTurn(battle: IBattleInfo): IAttackResult {
     Logger.Info(`[BattleTurnService] 敌人回合: 玩家使用道具，敌人反击`);
-
-    // 增加回合数
-    battle.turn++;
 
     // 获取技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
@@ -101,7 +111,9 @@ export class BattleTurnService {
           accuracy: skillMove.Accuracy,
           critRate: skillMove.CritRate || 1,
           priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1
+          mustHit: skillMove.MustHit === 1,
+          sideEffect: skillMove.SideEffect,
+          sideEffectArg: skillMove.SideEffectArg
         };
         skillConfigs.set(skillId, skillConfig);
       }
@@ -130,6 +142,8 @@ export class BattleTurnService {
         gainHp: 0,
         attackerRemainHp: battle.enemy.hp,
         attackerMaxHp: battle.enemy.maxHp,
+        defenderRemainHp: battle.player.hp,
+        defenderMaxHp: battle.player.maxHp,
         missed: false,
         blocked: false,
         isCrit: false,
@@ -156,6 +170,8 @@ export class BattleTurnService {
         gainHp: 0,
         attackerRemainHp: battle.enemy.hp,
         attackerMaxHp: battle.enemy.maxHp,
+        defenderRemainHp: battle.player.hp,
+        defenderMaxHp: battle.player.maxHp,
         missed: false,
         blocked: false,
         isCrit: false,
@@ -201,6 +217,8 @@ export class BattleTurnService {
       gainHp: 0,
       attackerRemainHp: battle.enemy.hp,
       attackerMaxHp: battle.enemy.maxHp,
+      defenderRemainHp: battle.player.hp,
+      defenderMaxHp: battle.player.maxHp,
       missed: !hit,
       blocked: false,
       isCrit: isCrit,

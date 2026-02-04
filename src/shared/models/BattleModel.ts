@@ -47,6 +47,7 @@ export interface IBattlePet {
   type: number;            // 属性类型
   skills: number[];        // 技能列表
   catchTime: number;       // 捕获时间
+  skinID?: number;         // 皮肤ID（用于客户端显示）
   statusArray: number[];   // 状态数组(20字节) - 用于协议传输
   battleLv: number[];      // 战斗等级(6字节)
   
@@ -69,6 +70,12 @@ export interface IBattlePet {
   skillPP?: number[];      // 技能PP数组
   encore?: boolean;        // 是否被克制
   encoreTurns?: number;    // 克制剩余回合数
+  
+  // 免疫标志
+  immuneFlags?: {
+    statDown?: boolean;    // 免疫能力下降
+    status?: boolean;      // 免疫异常状态
+  };
 }
 
 /**
@@ -82,6 +89,8 @@ export interface IAttackResult {
   gainHp: number;          // 回复HP
   attackerRemainHp: number; // 攻击者剩余HP
   attackerMaxHp: number;   // 攻击者最大HP
+  defenderRemainHp: number; // 被攻击者剩余HP（用于客户端显示）
+  defenderMaxHp: number;   // 被攻击者最大HP（用于客户端显示）
   missed: boolean;         // 是否未命中
   blocked: boolean;        // 是否被格挡
   isCrit: boolean;         // 是否暴击

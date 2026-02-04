@@ -7,3 +7,4 @@ export * from './PacketFightNpcMonster';
 export * from './PacketCatchMonster';
 export * from './PacketEscapeFight';
 export * from './PacketBattleReward';
+export * from './PacketChangePet';

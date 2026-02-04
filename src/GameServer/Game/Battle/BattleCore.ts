@@ -9,6 +9,7 @@ import { Logger } from '../../../shared/utils';
 import { IBattleInfo, IBattlePet, IAttackResult, ITurnResult, BattleStatus } from '../../../shared/models/BattleModel';
 import { BattleAlgorithm, SkillCategory } from './BattleAlgorithm';
 import { ISkillConfig } from '../../../shared/models/SkillModel';
+import { BattleAI } from './BattleAI';
 
 /**
  * 战斗状态枚举
@@ -47,6 +48,38 @@ export interface ICannotActReason {
  * 战斗核心类
  */
 export class BattleCore {
+
+  /**
+   * 同步状态数组
+   * 当设置 pet.status 时，同步更新 pet.statusArray 以便客户端显示
+   * 
+   * @deprecated 推荐使用 createBattlePetProxy() 自动同步，此方法作为后备方案
+   * @param pet 精灵对象
+   */
+  public static SyncStatusArray(pet: IBattlePet): void {
+    // 初始化 statusArray（20个元素，对应所有可能的状态）
+    if (!pet.statusArray) {
+      pet.statusArray = new Array(20).fill(0);
+    }
+
+    // 清空所有状态
+    pet.statusArray.fill(0);
+
+    // 如果有主要状态，设置对应位置的持续时间
+    if (pet.status !== undefined && pet.status >= 0) {
+      const duration = pet.statusTurns || 3;
+      pet.statusArray[pet.status] = duration;
+    }
+
+    // 如果有 statusDurations 数组，同步所有状态
+    if (pet.statusDurations && pet.statusDurations.length > 0) {
+      for (let i = 0; i < Math.min(pet.statusDurations.length, 20); i++) {
+        if (pet.statusDurations[i] > 0) {
+          pet.statusArray[i] = pet.statusDurations[i];
+        }
+      }
+    }
+  }
 
   // ==================== 状态效果处理 ====================
 
@@ -179,8 +212,29 @@ export class BattleCore {
 
   /**
    * 检查是否命中
+   * 
+   * 注意：此方法内部会触发 HIT_CHECK 效果，允许效果修改命中结果
    */
   public static CheckHit(attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig): boolean {
+    // 1. 必中技能
+    if (skill.mustHit) {
+      Logger.Debug(`[BattleCore] 必中技能: ${skill.name}`);
+      return true;
+    }
+
+    // 2. 触发 HIT_CHECK 效果（导入需要延迟加载避免循环依赖）
+    const { BattleEffectIntegration } = require('./BattleEffectIntegration');
+    const hitCheckResults = BattleEffectIntegration.OnHitCheck(attacker, defender, skill);
+    
+    // 3. 检查是否有必中效果
+    for (const result of hitCheckResults) {
+      if (result.success && (result.type === 'never_miss' || result.effectType === 'never_miss')) {
+        Logger.Debug(`[BattleCore] 效果必中: ${skill.name}`);
+        return true;
+      }
+    }
+
+    // 4. 计算命中率（考虑能力等级）
     const accuracy = skill.accuracy || 100;
     if (accuracy >= 100) return true;
 
@@ -190,12 +244,18 @@ export class BattleCore {
     const stageMod = BattleAlgorithm.ApplyStageModifier(100, accStage - evaStage) / 100;
 
     const finalAcc = Math.floor(accuracy * stageMod);
-    return Math.random() * 100 <= finalAcc;
+    
+    // 5. 命中判定
+    const hit = Math.random() * 100 <= finalAcc;
+    Logger.Debug(`[BattleCore] 命中判定: ${skill.name}, 命中率=${finalAcc}%, 结果=${hit}`);
+    return hit;
   }
 
   /**
    * 检查是否暴击
    * 考虑特殊暴击条件
+   * 
+   * 注意：此方法内部会触发 CRIT_CHECK 效果，允许效果修改暴击结果
    */
   public static CheckCrit(
     attacker: IBattlePet,
@@ -205,30 +265,65 @@ export class BattleCore {
   ): boolean {
     // CritAtkFirst: 先出手必暴击
     if (skill.critAtkFirst && isFirst) {
+      Logger.Debug(`[BattleCore] 先出手必暴击: ${skill.name}`);
       return true;
     }
 
     // CritAtkSecond: 后出手必暴击
     if (skill.critAtkSecond && !isFirst) {
+      Logger.Debug(`[BattleCore] 后出手必暴击: ${skill.name}`);
       return true;
     }
 
     // CritSelfHalfHp: 自身HP低于一半必暴击
     if (skill.critSelfHalfHp && attacker.hp < attacker.maxHp / 2) {
+      Logger.Debug(`[BattleCore] 自身低HP必暴击: ${skill.name}`);
       return true;
     }
 
     // CritFoeHalfHp: 对方HP低于一半必暴击
     if (skill.critFoeHalfHp && defender.hp < defender.maxHp / 2) {
+      Logger.Debug(`[BattleCore] 对方低HP必暴击: ${skill.name}`);
       return true;
     }
 
+    // 触发 CRIT_CHECK 效果（导入需要延迟加载避免循环依赖）
+    const { BattleEffectIntegration } = require('./BattleEffectIntegration');
+    const critCheckResults = BattleEffectIntegration.OnCritCheck(attacker, defender, skill);
+    
+    // 检查是否有必定暴击效果
+    for (const result of critCheckResults) {
+      if (result.success && (result.type === 'always_crit' || result.effectType === 'always_crit')) {
+        Logger.Debug(`[BattleCore] 效果必定暴击: ${skill.name}`);
+        return true;
+      }
+    }
+    
+    // 检查是否有暴击无效效果
+    for (const result of critCheckResults) {
+      if (result.success && (result.type === 'no_crit' || result.effectType === 'no_crit')) {
+        Logger.Debug(`[BattleCore] 效果暴击无效: ${skill.name}`);
+        return false;
+      }
+    }
+
     // 基础暴击率计算
-    const critRate = skill.critRate || 1;
+    let critRate = skill.critRate || 1;
     const speedStage = attacker.battleLv[4] || 0;
     const bonusCrit = Math.max(0, speedStage); // 速度等级正值增加暴击
+    
+    // 应用暴击率修正效果
+    for (const result of critCheckResults) {
+      if (result.success && (result.type === 'crit_modifier' || result.effectType === 'crit_modifier') && result.value !== undefined) {
+        critRate += result.value;
+        Logger.Debug(`[BattleCore] 暴击率修正: +${result.value}, 新暴击率=${critRate}`);
+      }
+    }
 
-    return Math.random() * 16 <= (critRate + bonusCrit);
+    // 暴击判定
+    const isCrit = Math.random() * 16 <= (critRate + bonusCrit);
+    Logger.Debug(`[BattleCore] 暴击判定: ${skill.name}, 暴击率=${critRate + bonusCrit}/16, 结果=${isCrit}`);
+    return isCrit;
   }
 
   // ==================== 速度比较 ====================
@@ -279,8 +374,8 @@ export class BattleCore {
   // ==================== AI系统 ====================
 
   /**
-   * AI选择技能
-   * 简单的评分系统
+   * AI选择技能（同步版本）
+   * 使用 BattleAI 系统进行智能选择
    */
   public static AISelectSkill(
     aiPet: IBattlePet,
@@ -288,63 +383,7 @@ export class BattleCore {
     skills: number[],
     skillConfigs: Map<number, ISkillConfig>
   ): number {
-    if (!skills || skills.length === 0) {
-      return 10001; // 默认撞击
-    }
-
-    let bestSkill = 0;
-    let bestScore = -1;
-
-    for (const skillId of skills) {
-      if (skillId <= 0) continue;
-
-      const skill = skillConfigs.get(skillId);
-      if (!skill) continue;
-
-      let score = 0;
-
-      if (skill.power && skill.power > 0) {
-        // 攻击技能评分
-        const typeMod = BattleAlgorithm.GetTypeEffectiveness(skill.type || 8, playerPet.type);
-        score = skill.power * typeMod;
-
-        // 考虑命中率
-        const accuracy = skill.accuracy || 100;
-        score = score * (accuracy / 100);
-
-        // 如果对方HP低，优先使用高威力技能
-        const hpRatio = playerPet.hp / playerPet.maxHp;
-        if (hpRatio < 0.3) {
-          score = score * 1.5; // 收割加成
-        }
-      } else {
-        // 变化技能评分 (较低优先级)
-        score = 10;
-
-        // 如果自己HP低，考虑使用回复技能
-        const hpRatio = aiPet.hp / aiPet.maxHp;
-        if (hpRatio < 0.5 && skill.sideEffect === 1) { // 吸血效果
-          score = 100; // 回复技能高优先级
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestSkill = skillId;
-      }
-    }
-
-    // 如果没有找到合适技能，使用第一个有效技能
-    if (bestSkill === 0) {
-      for (const skillId of skills) {
-        if (skillId > 0) {
-          bestSkill = skillId;
-          break;
-        }
-      }
-    }
-
-    return bestSkill || 10001;
+    return BattleAI.SelectSkill(aiPet, playerPet, skills, skillConfigs);
   }
 
   // ==================== 伤害计算 ====================

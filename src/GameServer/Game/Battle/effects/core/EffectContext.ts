@@ -5,58 +5,73 @@ import { IBattlePet } from '../../../../../shared/models/BattleModel';
  */
 export enum EffectTiming {
   // 战斗开始
-  BATTLE_START = 'battle_start',
+  BATTLE_START = 'BATTLE_START',
   
   // 回合开始
-  TURN_START = 'turn_start',
+  TURN_START = 'TURN_START',
   
   // 技能使用前
-  BEFORE_SKILL = 'before_skill',
+  BEFORE_SKILL = 'BEFORE_SKILL',
   
   // 速度判定前
-  BEFORE_SPEED_CHECK = 'before_speed_check',
+  BEFORE_SPEED_CHECK = 'BEFORE_SPEED_CHECK',
   
   // 命中判定前
-  BEFORE_HIT_CHECK = 'before_hit_check',
+  BEFORE_HIT_CHECK = 'BEFORE_HIT_CHECK',
   
   // 暴击判定前
-  BEFORE_CRIT_CHECK = 'before_crit_check',
+  BEFORE_CRIT_CHECK = 'BEFORE_CRIT_CHECK',
   
   // 伤害计算前
-  BEFORE_DAMAGE_CALC = 'before_damage_calc',
+  BEFORE_DAMAGE_CALC = 'BEFORE_DAMAGE_CALC',
   
   // 伤害计算后
-  AFTER_DAMAGE_CALC = 'after_damage_calc',
+  AFTER_DAMAGE_CALC = 'AFTER_DAMAGE_CALC',
   
   // 命中判定
-  HIT_CHECK = 'hit_check',
+  HIT_CHECK = 'HIT_CHECK',
   
   // 暴击判定
-  CRIT_CHECK = 'crit_check',
+  CRIT_CHECK = 'CRIT_CHECK',
   
   // 伤害应用前
-  BEFORE_DAMAGE_APPLY = 'before_damage_apply',
+  BEFORE_DAMAGE_APPLY = 'BEFORE_DAMAGE_APPLY',
   
   // 伤害应用后
-  AFTER_DAMAGE_APPLY = 'after_damage_apply',
+  AFTER_DAMAGE_APPLY = 'AFTER_DAMAGE_APPLY',
   
   // 技能使用后
-  AFTER_SKILL = 'after_skill',
+  AFTER_SKILL = 'AFTER_SKILL',
+  
+  // 命中判定后
+  AFTER_HIT_CHECK = 'AFTER_HIT_CHECK',
+  
+  // 击败对方后
+  AFTER_KO = 'AFTER_KO',
   
   // 回合结束
-  TURN_END = 'turn_end',
+  TURN_END = 'TURN_END',
   
   // 战斗结束
-  BATTLE_END = 'battle_end',
+  BATTLE_END = 'BATTLE_END',
   
   // HP变化时
-  ON_HP_CHANGE = 'on_hp_change',
+  ON_HP_CHANGE = 'ON_HP_CHANGE',
   
   // 受到攻击时
-  ON_ATTACKED = 'on_attacked',
+  ON_ATTACKED = 'ON_ATTACKED',
   
   // 攻击时
-  ON_ATTACK = 'on_attack'
+  ON_ATTACK = 'ON_ATTACK',
+  
+  // 击败对手时
+  ON_KO = 'ON_KO',
+  
+  // 受到伤害时
+  ON_RECEIVE_DAMAGE = 'ON_RECEIVE_DAMAGE',
+  
+  // 闪避时
+  ON_EVADE = 'ON_EVADE'
 }
 
 /**
@@ -105,6 +120,15 @@ export interface IEffectContext {
   alwaysFirst?: boolean;     // 先手
   instantKill?: boolean;     // 秒杀
   critRateBonus?: number;    // 暴击率加成
+  
+  // 扩展属性 - 用于原子效果间传递数据
+  effectData?: any;          // 效果数据（用于MultiHit、RandomPower等）
+  skill?: {                  // 技能对象（用于修改技能属性）
+    power: number;
+    accuracy: number;
+    priority: number;
+  };
+  critRate?: number;         // 暴击率（用于CritModifier）
 }
 
 /**
@@ -116,6 +140,7 @@ export interface IEffectResult {
   success: boolean;       // 是否成功
   target: 'attacker' | 'defender' | 'both';
   type: string;           // 效果类型
+  effectType?: string;    // 效果类型别名（用于特殊效果识别）
   value?: number;         // 数值
   message: string;        // 描述信息
   data?: any;             // 额外数据

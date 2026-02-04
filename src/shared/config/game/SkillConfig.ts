@@ -68,6 +68,11 @@ export class SkillConfig {
         const id = moveData.ID;
 
         if (id > 0) {
+          // 调试：记录技能10030的原始数据
+          if (id === 10030) {
+            Logger.Debug(`[SkillConfig] 技能10030原始数据: ${JSON.stringify(moveData)}`);
+          }
+
           const skill: ISkillConfig = {
             id,
             name: moveData.Name || `技能${id}`,
@@ -82,6 +87,14 @@ export class SkillConfig {
             sideEffect: moveData.SideEffect,
             sideEffectArg: moveData.SideEffectArg
           };
+
+          // 调试：记录有副作用的技能
+          if (skill.sideEffect) {
+            Logger.Debug(
+              `[SkillConfig] 加载技能: ${skill.name} (ID=${id}), ` +
+              `副作用=${skill.sideEffect}, 参数=${skill.sideEffectArg || '无'}`
+            );
+          }
 
           this._skills.set(id, skill);
           count++;

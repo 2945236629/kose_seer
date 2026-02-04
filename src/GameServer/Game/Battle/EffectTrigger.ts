@@ -2,39 +2,25 @@
  * 技能效果触发器
  * 负责在战斗中触发和应用技能效果
  * 
- * 集成效果系统到战斗流程
+ * 集成原子效果系统到战斗流程
  * 
  * 支持多效果技能：
  * - 单效果: SideEffect="4", SideEffectArg="0 100 1"
  * - 多效果: SideEffect="4 4 4", SideEffectArg="0 100 1 1 100 1 2 100 1"
+ * 
+ * 使用原子效果组合：
+ * - 从 skill_effects_v2.json 读取 atomicComposition 配置
+ * - 使用 AtomicEffectFactory 创建原子效果实例
+ * - 执行原子效果组合并返回结果
  */
 
 import { Logger } from '../../../shared/utils';
 import { IBattlePet } from '../../../shared/models/BattleModel';
 import { ISkillConfig } from '../../../shared/models/SkillModel';
-import { EffectRegistry } from './effects/core/EffectRegistry';
 import { EffectTiming, createEffectContext, IEffectResult } from './effects/core/EffectContext';
-import { SkillEffectConfig } from '../../../shared/config/game/SkillEffectConfig';
-
-/**
- * 效果参数数量映射
- * 根据客户端 Effect_X.as 中的 _argsNum 定义
- */
-const EFFECT_ARGS_NUM_MAP: Record<number, number> = {
-  // 能力变化类 (3个参数: 能力索引, 触发概率, 等级变化)
-  4: 3,   // Effect_4: 自身能力等级变化
-  5: 3,   // Effect_5: 对方能力等级变化
-  
-  // 状态类 (1个参数: 触发概率)
-  11: 1,  // Effect_11: 中毒
-  12: 1,  // Effect_12: 烧伤
-  14: 1,  // Effect_14: 冻伤
-  
-  // 吸取类 (1个参数: 回合数)
-  13: 1,  // Effect_13: 吸取
-  
-  // 默认: 无参数
-};
+import { SkillEffectsConfig } from '../../../shared/config/game/SkillEffectsConfig';
+import { AtomicEffectFactory } from './effects/atomic/core/AtomicEffectFactory';
+import { IAtomicEffectParams } from './effects/atomic/core/IAtomicEffect';
 
 /**
  * 效果触发器类
@@ -60,8 +46,14 @@ export class EffectTrigger {
   ): IEffectResult[] {
     // 如果技能没有附加效果，直接返回
     if (!skill.sideEffect || skill.sideEffect === 0) {
+      Logger.Debug(`[EffectTrigger] 技能无副作用: ${skill.name} (ID=${skill.id})`);
       return [];
     }
+
+    Logger.Debug(
+      `[EffectTrigger] 触发技能效果: ${skill.name} (ID=${skill.id}), ` +
+      `副作用=${skill.sideEffect}, 时机=${timing}`
+    );
 
     // 检查是否为多效果技能
     const sideEffectStr = skill.sideEffect.toString();
@@ -75,7 +67,7 @@ export class EffectTrigger {
   }
 
   /**
-   * 触发单个技能效果
+   * 触发单个技能效果（使用原子效果组合）
    * 
    * @param skill 技能配置
    * @param attacker 攻击方
@@ -96,59 +88,100 @@ export class EffectTrigger {
     try {
       const effectId = typeof skill.sideEffect === 'number' 
         ? skill.sideEffect 
-        : parseInt(skill.sideEffect.toString());
+        : parseInt(skill.sideEffect?.toString() || '0');
 
-      // 1. 从配置获取效果信息
-      const effectConfig = SkillEffectConfig.GetEffect(effectId);
+      // 1. 从新配置系统获取效果信息
+      const effectConfig = SkillEffectsConfig.Instance.GetEffectById(effectId);
       if (!effectConfig) {
         Logger.Warn(`[EffectTrigger] 效果配置不存在: effectId=${effectId}`);
         return [];
       }
 
-      // 2. 从注册表获取效果实例
-      const effect = EffectRegistry.getInstance().getEffect(effectConfig.eid);
-      if (!effect) {
-        Logger.Warn(`[EffectTrigger] 效果未注册: eid=${effectConfig.eid}`);
+      // 2. 检查是否有原子效果组合配置
+      if (!effectConfig.atomicComposition || !effectConfig.atomicComposition.atoms) {
+        Logger.Warn(`[EffectTrigger] 效果缺少原子组合配置: effectId=${effectId}, name=${effectConfig.name}`);
         return [];
       }
 
       // 3. 检查是否在正确的时机触发
-      if (!effect.canTrigger(timing)) {
+      if (!effectConfig.timing || !effectConfig.timing.includes(timing)) {
+        // 效果时机不匹配，静默跳过
         return [];
       }
 
-      // 4. 解析效果参数
-      const effectArgs = this.ParseEffectArgs(skill.sideEffectArg || effectConfig.args);
-
-      // 5. 创建效果上下文
+      // 4. 创建效果上下文
       const context = createEffectContext(attacker, defender, skill.id, damage, timing);
       context.effectId = effectId;
-      context.effectArgs = effectArgs;
       context.skillType = skill.type;
       context.skillCategory = skill.category;
       context.skillPower = skill.power;
 
-      // 6. 执行效果
-      const effectResults = effect.execute(context);
-      results.push(...effectResults);
+      // 5. 解析 SideEffectArg 参数
+      const effectArgs = this.ParseEffectArgs(skill.sideEffectArg);
+      context.effectArgs = effectArgs;
 
-      // 7. 记录日志
-      if (effectResults.length > 0) {
+      // 6. 执行原子效果组合
+      const atoms = effectConfig.atomicComposition.atoms;
+      Logger.Debug(
+        `[EffectTrigger] 执行原子效果组合: ${effectConfig.name} (ID=${effectId}), ` +
+        `原子数: ${atoms.length}, 时机: ${timing}, 参数: ${effectArgs.join(',')}`
+      );
+
+      for (const atomConfig of atoms) {
+        // 克隆原子配置，避免修改原始配置
+        const atomConfigWithArgs = { ...atomConfig };
+        
+        // 根据效果配置的参数定义，覆盖原子效果的参数
+        if (effectConfig.args && effectConfig.args.length > 0 && effectArgs.length > 0) {
+          for (let i = 0; i < effectConfig.args.length && i < effectArgs.length; i++) {
+            const argDef = effectConfig.args[i];
+            const argValue = effectArgs[i];
+            
+            // 将参数值应用到原子效果配置
+            // 例如：args[0].name = "probability" → atomConfig.probability = argValue
+            if (argDef.name) {
+              (atomConfigWithArgs as any)[argDef.name] = argValue;
+            }
+          }
+        }
+        
+        const atom = AtomicEffectFactory.getInstance().create(atomConfigWithArgs as IAtomicEffectParams);
+        if (!atom) {
+          Logger.Warn(`[EffectTrigger] 创建原子效果失败: type=${atomConfig.type}`);
+          continue;
+        }
+
+        // 检查原子效果是否可以在当前时机触发
+        if (!atom.canTriggerAt(timing)) {
+          // 原子效果时机不匹配，静默跳过
+          continue;
+        }
+
+        // 执行原子效果
+        const atomResults = atom.execute(context);
+        results.push(...atomResults);
+
         Logger.Debug(
-          `[EffectTrigger] 触发效果: ${effect.getEffectName()} (Eid=${effectConfig.eid}), ` +
-          `结果数: ${effectResults.length}`
+          `[EffectTrigger] 原子效果执行: ${atom.name}, 结果数: ${atomResults.length}`
+        );
+      }
+
+      if (results.length > 0) {
+        Logger.Info(
+          `[EffectTrigger] 效果执行成功: ${effectConfig.name} (ID=${effectId}), ` +
+          `总结果数: ${results.length}`
         );
       }
 
     } catch (error) {
-      Logger.Error(`[EffectTrigger] 单效果执行失败: ${error}`);
+      Logger.Error(`[EffectTrigger] 单效果执行失败: ${error}`, error as Error);
     }
 
     return results;
   }
 
   /**
-   * 触发多个技能效果
+   * 触发多个技能效果（使用原子效果组合）
    * 
    * 示例：
    * SideEffect="4 4 4 4 4 4"
@@ -172,75 +205,76 @@ export class EffectTrigger {
 
     try {
       // 1. 解析多个效果ID
-      const sideEffectStr = skill.sideEffect.toString();
+      const sideEffectStr = skill.sideEffect?.toString() || '';
       const effectIds = sideEffectStr.split(' ').map(id => parseInt(id.trim())).filter(id => id > 0);
       
       if (effectIds.length === 0) {
         return [];
       }
 
-      // 2. 解析所有参数
-      const allArgs = this.ParseEffectArgs(skill.sideEffectArg || '');
-      
       Logger.Debug(
         `[EffectTrigger] 多效果技能: ${skill.name} (ID=${skill.id}), ` +
-        `效果数: ${effectIds.length}, 参数数: ${allArgs.length}`
+        `效果数: ${effectIds.length}, 时机: ${timing}`
       );
 
-      // 3. 按顺序处理每个效果
-      let argIndex = 0;
-      
+      // 2. 按顺序处理每个效果
       for (let i = 0; i < effectIds.length; i++) {
         const effectId = effectIds[i];
         
         // 获取效果配置
-        const effectConfig = SkillEffectConfig.GetEffect(effectId);
+        const effectConfig = SkillEffectsConfig.Instance.GetEffectById(effectId);
         if (!effectConfig) {
           Logger.Warn(`[EffectTrigger] 效果配置不存在: effectId=${effectId}`);
           continue;
         }
 
-        // 获取效果实例
-        const effect = EffectRegistry.getInstance().getEffect(effectConfig.eid);
-        if (!effect) {
-          Logger.Warn(`[EffectTrigger] 效果未注册: eid=${effectConfig.eid}`);
+        // 检查是否有原子效果组合配置
+        if (!effectConfig.atomicComposition || !effectConfig.atomicComposition.atoms) {
+          Logger.Warn(`[EffectTrigger] 效果缺少原子组合配置: effectId=${effectId}, name=${effectConfig.name}`);
           continue;
         }
 
         // 检查触发时机
-        if (!effect.canTrigger(timing)) {
+        if (!effectConfig.timing || !effectConfig.timing.includes(timing)) {
+          // 效果时机不匹配，静默跳过
           continue;
         }
-
-        // 获取该效果需要的参数数量
-        const argsNum = this.GetEffectArgsNum(effectConfig.eid);
-        
-        // 提取该效果的参数
-        const effectArgs = allArgs.slice(argIndex, argIndex + argsNum);
-        argIndex += argsNum;
-
-        Logger.Debug(
-          `[EffectTrigger] 效果 ${i + 1}/${effectIds.length}: ` +
-          `Eid=${effectConfig.eid}, 参数=${effectArgs.join(' ')}`
-        );
 
         // 创建效果上下文
         const context = createEffectContext(attacker, defender, skill.id, damage, timing);
         context.effectId = effectId;
-        context.effectArgs = effectArgs;
         context.skillType = skill.type;
         context.skillCategory = skill.category;
         context.skillPower = skill.power;
 
-        // 执行效果
-        const effectResults = effect.execute(context);
-        allResults.push(...effectResults);
+        // 执行原子效果组合
+        const atoms = effectConfig.atomicComposition.atoms;
+        Logger.Debug(
+          `[EffectTrigger] 效果 ${i + 1}/${effectIds.length}: ${effectConfig.name} (ID=${effectId}), ` +
+          `原子数: ${atoms.length}`
+        );
 
-        if (effectResults.length > 0) {
-          Logger.Debug(
-            `[EffectTrigger] 效果执行成功: ${effect.getEffectName()}, ` +
-            `结果数: ${effectResults.length}`
-          );
+        for (const atomConfig of atoms) {
+          const atom = AtomicEffectFactory.getInstance().create(atomConfig as IAtomicEffectParams);
+          if (!atom) {
+            Logger.Warn(`[EffectTrigger] 创建原子效果失败: type=${atomConfig.type}`);
+            continue;
+          }
+
+          // 检查原子效果是否可以在当前时机触发
+          if (!atom.canTriggerAt(timing)) {
+            continue;
+          }
+
+          // 执行原子效果
+          const atomResults = atom.execute(context);
+          allResults.push(...atomResults);
+
+          if (atomResults.length > 0) {
+            Logger.Debug(
+              `[EffectTrigger] 原子效果执行: ${atom.name}, 结果数: ${atomResults.length}`
+            );
+          }
         }
       }
 
@@ -250,20 +284,63 @@ export class EffectTrigger {
       );
 
     } catch (error) {
-      Logger.Error(`[EffectTrigger] 多效果执行失败: ${error}`);
+      Logger.Error(`[EffectTrigger] 多效果执行失败: ${error}`, error as Error);
     }
 
     return allResults;
   }
 
   /**
-   * 获取效果需要的参数数量
+   * 解析效果参数字符串
    * 
-   * @param eid 效果类型ID
-   * @returns 参数数量
+   * @param sideEffectArg 参数字符串或数字，例如 "10" 或 10 或 "2 5" 或 "0 100 1"
+   * @returns 参数数组
    */
-  private static GetEffectArgsNum(eid: number): number {
-    return EFFECT_ARGS_NUM_MAP[eid] || 0;
+  private static ParseEffectArgs(sideEffectArg?: string | number): number[] {
+    if (sideEffectArg === undefined || sideEffectArg === null) {
+      return [];
+    }
+
+    try {
+      // 如果是数字，直接返回单元素数组
+      if (typeof sideEffectArg === 'number') {
+        return [sideEffectArg];
+      }
+
+      // 如果是字符串，按空格分割
+      const argStr = sideEffectArg.toString().trim();
+      if (argStr === '') {
+        return [];
+      }
+
+      return argStr.split(/\s+/).map(arg => {
+        const num = parseInt(arg);
+        return isNaN(num) ? 0 : num;
+      });
+    } catch (error) {
+      Logger.Warn(`[EffectTrigger] 解析效果参数失败: ${sideEffectArg}`);
+      return [];
+    }
+  }
+
+  /**
+   * 批量触发效果（用于多个时机）
+   */
+  public static TriggerMultipleEffects(
+    skill: ISkillConfig,
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    damage: number,
+    timings: EffectTiming[]
+  ): IEffectResult[] {
+    const allResults: IEffectResult[] = [];
+
+    for (const timing of timings) {
+      const results = this.TriggerSkillEffect(skill, attacker, defender, damage, timing);
+      allResults.push(...results);
+    }
+
+    return allResults;
   }
 
   /**
@@ -284,6 +361,12 @@ export class EffectTrigger {
       }
 
       const target = result.target === 'attacker' ? attacker : defender;
+
+      // ==================== 效果免疫检查 ====================
+      if (this.IsImmune(target, result)) {
+        Logger.Info(`[效果应用] ${target.name} 免疫效果: ${result.type}`);
+        continue;
+      }
 
       switch (result.type) {
         case 'heal':
@@ -313,6 +396,8 @@ export class EffectTrigger {
             target.statusDurations[result.data.status] = result.data.duration || 3;
             target.status = result.data.status;
             target.statusTurns = result.data.duration || 3;
+            // Proxy 会自动同步 statusArray
+            
             Logger.Info(
               `[效果应用] ${result.target} 进入状态: ${result.data.statusName}, ` +
               `持续 ${result.data.duration} 回合`
@@ -331,12 +416,73 @@ export class EffectTrigger {
             const newStage = Math.max(-6, Math.min(6, oldStage + result.data.stages));
             target.battleLv[statIndex] = newStage;
             
-            const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
-            const change = result.data.stages > 0 ? '提升' : '降低';
-            Logger.Info(
-              `[效果应用] ${result.target} ${statNames[statIndex]}${change} ` +
-              `${Math.abs(result.data.stages)} 级 (${oldStage} → ${newStage})`
-            );
+            // 如果有持续时间，记录到effectCounters
+            if (result.data.duration && result.data.duration > 0) {
+              if (!target.effectCounters) {
+                target.effectCounters = {};
+              }
+              
+              // 检查是否已有同类临时效果
+              const counterKey = `stat_${statIndex}_boost_${result.data.stages}`;
+              const existingKeys = Object.keys(target.effectCounters).filter(
+                k => k.startsWith(`stat_${statIndex}_boost_`)
+              );
+              
+              if (existingKeys.length > 0) {
+                // 已有同类效果，根据叠加规则处理
+                const stackRule = result.data.stackRule || 'refresh'; // 默认刷新持续时间
+                
+                if (stackRule === 'refresh') {
+                  // 刷新持续时间，不叠加等级
+                  target.effectCounters[existingKeys[0]] = result.data.duration;
+                  Logger.Info(
+                    `[效果应用] ${result.target} 刷新能力变化持续时间: ` +
+                    `${this.GetStatName(statIndex)}, 持续${result.data.duration}回合`
+                  );
+                } else if (stackRule === 'stack') {
+                  // 叠加效果（新增计数器）
+                  target.effectCounters[counterKey] = result.data.duration;
+                  Logger.Info(
+                    `[效果应用] ${result.target} 叠加能力变化: ` +
+                    `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages}, ` +
+                    `持续${result.data.duration}回合`
+                  );
+                } else if (stackRule === 'replace') {
+                  // 替换旧效果
+                  // 先恢复旧效果
+                  for (const oldKey of existingKeys) {
+                    const oldMatch = oldKey.match(/stat_\d+_boost_(-?\d+)/);
+                    if (oldMatch) {
+                      const oldStages = parseInt(oldMatch[1]);
+                      target.battleLv[statIndex] = Math.max(-6, Math.min(6, target.battleLv[statIndex] - oldStages));
+                    }
+                    delete target.effectCounters[oldKey];
+                  }
+                  // 应用新效果（已在上面应用）
+                  target.effectCounters[counterKey] = result.data.duration;
+                  Logger.Info(
+                    `[效果应用] ${result.target} 替换能力变化: ` +
+                    `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages}, ` +
+                    `持续${result.data.duration}回合`
+                  );
+                }
+              } else {
+                // 没有同类效果，直接添加
+                target.effectCounters[counterKey] = result.data.duration;
+                Logger.Info(
+                  `[效果应用] ${result.target} 能力变化（临时${result.data.duration}回合）: ` +
+                  `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages} ` +
+                  `(${oldStage} → ${newStage})`
+                );
+              }
+            } else {
+              const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
+              const change = result.data.stages > 0 ? '提升' : '降低';
+              Logger.Info(
+                `[效果应用] ${result.target} ${statNames[statIndex]}${change} ` +
+                `${Math.abs(result.data.stages)} 级 (${oldStage} → ${newStage})`
+              );
+            }
           }
           break;
 
@@ -386,50 +532,38 @@ export class EffectTrigger {
   }
 
   /**
-   * 解析效果参数字符串
-   * 格式: "arg1 arg2 arg3" 或 "arg1,arg2,arg3"
-   */
-  private static ParseEffectArgs(argsStr: string): number[] {
-    if (!argsStr || argsStr.trim() === '') {
-      return [];
-    }
-
-    const args: number[] = [];
-    const matches = argsStr.match(/(-?\d+)/g);
-
-    if (matches) {
-      for (const match of matches) {
-        args.push(parseInt(match, 10));
-      }
-    }
-
-    return args;
-  }
-
-  /**
-   * 批量触发效果（用于多个时机）
-   */
-  public static TriggerMultipleEffects(
-    skill: ISkillConfig,
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    damage: number,
-    timings: EffectTiming[]
-  ): IEffectResult[] {
-    const allResults: IEffectResult[] = [];
-
-    for (const timing of timings) {
-      const results = this.TriggerSkillEffect(skill, attacker, defender, damage, timing);
-      allResults.push(...results);
-    }
-
-    return allResults;
-  }
-
-  /**
    * 检查效果是否应该触发（概率判定）
    */
   public static ShouldTrigger(chance: number): boolean {
     return Math.random() * 100 < chance;
+  }
+
+  /**
+   * 检查目标是否免疫效果
+   */
+  private static IsImmune(target: IBattlePet, result: IEffectResult): boolean {
+    if (!target.immuneFlags) {
+      return false;
+    }
+
+    // 免疫状态效果
+    if (result.type === 'status' && target.immuneFlags.status) {
+      return true;
+    }
+
+    // 免疫能力下降
+    if (result.type === 'stat_change' && result.data?.stages < 0 && target.immuneFlags.statDown) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 获取能力名称
+   */
+  private static GetStatName(statIndex: number): string {
+    const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
+    return statNames[statIndex] || '未知';
   }
 }

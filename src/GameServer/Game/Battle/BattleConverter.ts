@@ -27,7 +27,7 @@ export class BattleConverter {
       .setCatchTime(pet.catchTime)
       .setCatchMap(301)  // 默认地图301
       .setCatchLevel(pet.level)  // 捕获等级（简化为当前等级）
-      .setSkinID(0);
+      .setSkinID(pet.skinID || 0);  // 使用实际皮肤ID
   }
 
   /**
@@ -57,20 +57,33 @@ export class BattleConverter {
     defaultMaxHp: number,
     defaultStatus: BattleStatus | undefined,
     defaultBattleLv: number[],
-    petType: number
+    petType: number,
+    attackerPet?: IBattlePet  // 新增：攻击者精灵信息（用于填充skillList）
   ): AttackValueProto {
     const proto = new AttackValueProto();
 
     if (attack) {
+      // 构建技能列表（如果有攻击者信息）
+      const skillList: Array<{ id: number; pp: number }> = [];
+      if (attackerPet) {
+        for (let i = 0; i < attackerPet.skills.length; i++) {
+          skillList.push({
+            id: attackerPet.skills[i],
+            pp: attackerPet.skillPP && attackerPet.skillPP[i] !== undefined ? attackerPet.skillPP[i] : 20
+          });
+        }
+      }
+      
       proto
         .setUserId(attack.userId)
         .setSkillId(attack.skillId)
         .setAtkTimes(attack.atkTimes)
         .setDamage(attack.damage)
-        .setGainHP(attack.gainHp)
-        .setRemainHp(attack.attackerRemainHp)
-        .setMaxHp(attack.attackerMaxHp)
+        .setGainHP(attack.gainHp)  // 攻击者获得的HP（吸血等）
+        .setRemainHp(attack.attackerRemainHp)  // 攻击者的剩余HP（客户端用于更新攻击者HP条）
+        .setMaxHp(attack.attackerMaxHp)        // 攻击者的最大HP
         .setState(attack.missed || attack.blocked ? 1 : 0)
+        .setSkillList(skillList)  // 填充技能列表
         .setIsCrit(attack.isCrit ? 1 : 0)
         .setStatus(attack.attackerStatus)
         .setBattleLv(attack.attackerBattleLv)

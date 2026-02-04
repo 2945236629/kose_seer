@@ -1,7 +1,7 @@
 import { Logger } from '../../../../shared/utils';
 import { IBattlePet } from '../../../../shared/models/BattleModel';
 import { IEffectResult, EffectTiming, createEffectContext } from '../effects/core/EffectContext';
-import { effectManager } from '../effects/core/EffectManager';
+// import { effectManager } from '../effects/core/EffectManager'; // TODO: 待实现
 
 /**
  * 技能效果服务
@@ -38,7 +38,9 @@ export class SkillEffectService {
       const context = createEffectContext(attacker, defender, skillId, damage, timing);
       
       // 执行效果
-      const results = effectManager.executeEffect(effectId, context, customArgs);
+      // TODO: 待实现effectManager
+      // const results = effectManager.executeEffect(effectId, context, customArgs);
+      const results: IEffectResult[] = [];
       
       Logger.Debug(`[SkillEffectService] 处理效果: EffectId=${effectId}, Results=${results.length}`);
       
@@ -92,7 +94,9 @@ export class SkillEffectService {
     skillId: number,
     damage: number = 0
   ): IEffectResult[] {
-    return effectManager.executeEffectsAtTiming(timing, attacker, defender, skillId, damage);
+    // TODO: 待实现effectManager
+    // return effectManager.executeEffectsAtTiming(timing, attacker, defender, skillId, damage);
+    return [];
   }
 
   /**

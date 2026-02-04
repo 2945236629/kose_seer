@@ -11,6 +11,7 @@ import { ISkillConfig } from '../../../shared/models/SkillModel';
 import { BattleCore } from './BattleCore';
 import { EffectTrigger } from './EffectTrigger';
 import { EffectTiming } from './effects/core/EffectContext';
+import { BattleEffectIntegration } from './BattleEffectIntegration';
 
 /**
  * 战斗回合执行器类
@@ -30,11 +31,31 @@ export class BattleTurnExecutor {
     playerSkillId: number,
     skillConfigs: Map<number, ISkillConfig>
   ): ITurnResult {
-    battle.turn++;
-    
     Logger.Info(`[BattleTurnExecutor] 回合 ${battle.turn}: 玩家使用技能 ${playerSkillId}`);
     Logger.Debug(`[BattleTurnExecutor] 玩家: HP=${battle.player.hp}/${battle.player.maxHp}, Speed=${battle.player.speed}`);
     Logger.Debug(`[BattleTurnExecutor] 敌人: HP=${battle.enemy.hp}/${battle.enemy.maxHp}, Speed=${battle.enemy.speed}`);
+
+    // ==================== 回合开始效果 ====================
+    const turnStartResults = BattleEffectIntegration.OnTurnStart(battle);
+    Logger.Debug(`[BattleTurnExecutor] 回合开始效果: ${turnStartResults.length}个结果`);
+    
+    // 检查回合开始效果是否导致死亡
+    if (battle.player.hp <= 0) {
+      battle.isOver = true;
+      return {
+        isOver: true,
+        winner: 0,
+        reason: 0
+      };
+    }
+    if (battle.enemy.hp <= 0) {
+      battle.isOver = true;
+      return {
+        isOver: true,
+        winner: battle.userId,
+        reason: 0
+      };
+    }
 
     // 1. 获取技能配置
     const playerSkill = skillConfigs.get(playerSkillId) || this.GetDefaultSkill();
@@ -91,6 +112,15 @@ export class BattleTurnExecutor {
     // 4. 检查是否可以行动
     const playerCanAct = BattleCore.CanAct(battle.player);
     const enemyCanAct = BattleCore.CanAct(battle.enemy);
+
+    // ==================== 速度判定前效果 ====================
+    const speedCheckResults = BattleEffectIntegration.OnBeforeSpeedCheck(
+      battle.player,
+      battle.enemy,
+      playerSkill,
+      enemySkill
+    );
+    Logger.Debug(`[BattleTurnExecutor] 速度判定前效果: ${speedCheckResults.length}个结果`);
 
     // 5. 决定先后攻
     const playerFirst = BattleCore.CompareSpeed(
@@ -181,6 +211,25 @@ export class BattleTurnExecutor {
       }
     }
 
+    // ==================== 回合结束效果 ====================
+    if (!result.isOver) {
+      const turnEndResults = BattleEffectIntegration.OnTurnEnd(battle);
+      Logger.Debug(`[BattleTurnExecutor] 回合结束效果: ${turnEndResults.length}个结果`);
+      
+      // 检查回合结束效果是否导致死亡
+      if (battle.player.hp <= 0) {
+        battle.isOver = true;
+        result.isOver = true;
+        result.winner = 0;
+        result.reason = 0;
+      } else if (battle.enemy.hp <= 0) {
+        battle.isOver = true;
+        result.isOver = true;
+        result.winner = battle.userId;
+        result.reason = 0;
+      }
+    }
+
     return result;
   }
 
@@ -208,6 +257,8 @@ export class BattleTurnExecutor {
         gainHp: 0,
         attackerRemainHp: attacker.hp,
         attackerMaxHp: attacker.maxHp,
+        defenderRemainHp: defender.hp,
+        defenderMaxHp: defender.maxHp,
         missed: false,
         blocked: false,
         isCrit: false,
@@ -216,20 +267,31 @@ export class BattleTurnExecutor {
       };
     }
 
+    // ==================== 攻击时效果 ====================
+    const attackResults = BattleEffectIntegration.OnAttack(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 攻击时效果: ${attackResults.length}个结果`);
+
     // ==================== 技能使用前效果 ====================
-    const beforeSkillEffects = EffectTrigger.TriggerSkillEffect(
-      skill,
-      attacker,
-      defender,
-      0,
-      EffectTiming.BEFORE_SKILL
-    );
-    EffectTrigger.ApplyEffectResults(beforeSkillEffects, attacker, defender);
+    const beforeSkillResults = BattleEffectIntegration.OnBeforeSkill(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 技能使用前效果: ${beforeSkillResults.length}个结果`);
+
+    // ==================== 命中判定前效果 ====================
+    const beforeHitCheckResults = BattleEffectIntegration.OnBeforeHitCheck(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 命中判定前效果: ${beforeHitCheckResults.length}个结果`);
 
     // ==================== 命中判定 ====================
     const hit = BattleCore.CheckHit(attacker, defender, skill);
+    
+    // ==================== 命中判定后效果 ====================
+    const afterHitCheckResults = BattleEffectIntegration.OnAfterHitCheck(attacker, defender, skill, hit);
+    Logger.Debug(`[ExecuteAttack] 命中判定后效果: ${afterHitCheckResults.length}个结果`);
+    
     if (!hit) {
       Logger.Info(`[攻击] 技能 ${skill.name} 未命中`);
+      
+      // ==================== 闪避效果 ====================
+      const evadeResults = BattleEffectIntegration.OnEvade(attacker, defender, skill);
+      Logger.Debug(`[ExecuteAttack] 闪避效果: ${evadeResults.length}个结果`);
       
       // 触发未命中后的效果
       const missEffects = EffectTrigger.TriggerSkillEffect(
@@ -249,6 +311,8 @@ export class BattleTurnExecutor {
         gainHp: 0,
         attackerRemainHp: attacker.hp,
         attackerMaxHp: attacker.maxHp,
+        defenderRemainHp: defender.hp,
+        defenderMaxHp: defender.maxHp,
         missed: true,
         blocked: false,
         isCrit: false,
@@ -257,88 +321,109 @@ export class BattleTurnExecutor {
       };
     }
 
+    // ==================== 受到攻击时效果 ====================
+    const attackedResults = BattleEffectIntegration.OnAttacked(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 受到攻击时效果: ${attackedResults.length}个结果`);
+
+    // ==================== 暴击判定前效果 ====================
+    const beforeCritCheckResults = BattleEffectIntegration.OnBeforeCritCheck(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 暴击判定前效果: ${beforeCritCheckResults.length}个结果`);
+
     // ==================== 暴击判定 ====================
     const isCrit = BattleCore.CheckCrit(attacker, defender, skill, isFirst);
 
     // ==================== 伤害计算前效果 ====================
-    const beforeDamageEffects = EffectTrigger.TriggerSkillEffect(
-      skill,
-      attacker,
-      defender,
-      0,
-      EffectTiming.BEFORE_DAMAGE_CALC
-    );
-    EffectTrigger.ApplyEffectResults(beforeDamageEffects, attacker, defender);
+    const beforeCalcResults = BattleEffectIntegration.OnBeforeDamageCalc(attacker, defender, skill);
+    Logger.Debug(`[ExecuteAttack] 伤害计算前效果: ${beforeCalcResults.length}个结果`);
 
     // ==================== 伤害计算 ====================
     const damageResult = BattleCore.CalculateDamage(attacker, defender, skill, isCrit);
     let damage = damageResult.damage;
 
-    // ==================== 伤害计算后效果 ====================
-    const afterDamageCalcEffects = EffectTrigger.TriggerSkillEffect(
-      skill,
-      attacker,
-      defender,
-      damage,
-      EffectTiming.AFTER_DAMAGE_CALC
-    );
-    EffectTrigger.ApplyEffectResults(afterDamageCalcEffects, attacker, defender);
+    // ==================== 伤害计算后效果（伤害上限/下限）====================
+    const afterCalcResult = BattleEffectIntegration.OnAfterDamageCalc(attacker, defender, skill, damage);
+    damage = afterCalcResult.damage;
+    Logger.Debug(`[ExecuteAttack] 伤害计算后: ${damage} (原始: ${damageResult.damage})`);
+
+    // ==================== 伤害应用前效果（伤害减免）====================
+    const beforeApplyResult = BattleEffectIntegration.OnBeforeDamageApply(attacker, defender, skill, damage);
+    damage = beforeApplyResult.damage;
+    Logger.Debug(`[ExecuteAttack] 伤害应用前: ${damage}`);
 
     // ==================== 应用伤害 ====================
-    defender.hp = Math.max(0, defender.hp - damage);
+    const actualDamage = damage;
+    const oldDefenderHP = defender.hp;
+    defender.hp = Math.max(0, defender.hp - actualDamage);
+
+    // ==================== HP变化时效果 ====================
+    if (oldDefenderHP !== defender.hp) {
+      const hpChangeResults = BattleEffectIntegration.OnHPChange(
+        defender,
+        attacker,
+        oldDefenderHP,
+        defender.hp
+      );
+      Logger.Debug(`[ExecuteAttack] HP变化效果: ${hpChangeResults.length}个结果`);
+    }
 
     Logger.Info(
       `[攻击] ${attackerUserId === 0 ? '敌人' : '玩家'} 使用 ${skill.name}, ` +
-      `造成 ${damage} 点伤害${isCrit ? ' (暴击!)' : ''}, ` +
+      `造成 ${actualDamage} 点伤害${isCrit ? ' (暴击!)' : ''}, ` +
       `对方剩余HP: ${defender.hp}/${defender.maxHp}`
     );
 
-    // ==================== 伤害应用后效果 ====================
-    
-    // 1. 触发效果（吸血、反伤、状态效果等）
-    const effectResults = EffectTrigger.TriggerSkillEffect(
-      skill,
-      attacker,
-      defender,
-      damage,
-      EffectTiming.AFTER_DAMAGE_APPLY
-    );
+    // ==================== 伤害应用后效果（吸血、反伤等）====================
+    const afterApplyResults = BattleEffectIntegration.OnAfterDamageApply(attacker, defender, skill, actualDamage);
+    Logger.Debug(`[ExecuteAttack] 伤害应用后效果: ${afterApplyResults.length}个结果`);
 
-    // 2. 应用效果结果
-    EffectTrigger.ApplyEffectResults(effectResults, attacker, defender);
+    // ==================== 受到伤害时效果 ====================
+    const receiveDamageResults = BattleEffectIntegration.OnReceiveDamage(attacker, defender, skill, actualDamage);
+    Logger.Debug(`[ExecuteAttack] 受到伤害效果: ${receiveDamageResults.length}个结果`);
 
-    // 3. 记录效果信息
+    // ==================== 技能使用后效果（能力变化、状态施加等）====================
+    const afterSkillResults = BattleEffectIntegration.OnAfterSkill(attacker, defender, skill, actualDamage);
+    Logger.Debug(`[ExecuteAttack] 技能使用后效果: ${afterSkillResults.length}个结果`);
+
+    // ==================== 击败效果 ====================
+    if (defender.hp <= 0) {
+      const koResults = BattleEffectIntegration.OnKO(attacker, defender, skill);
+      Logger.Debug(`[ExecuteAttack] 击败效果: ${koResults.length}个结果`);
+      
+      // ==================== 击败对方后效果 ====================
+      const afterKoResults = BattleEffectIntegration.OnAfterKO(attacker, defender, skill);
+      Logger.Debug(`[ExecuteAttack] 击败对方后效果: ${afterKoResults.length}个结果`);
+    }
+
+    // ==================== 统计效果结果（吸血等）====================
     let gainHp = 0;
-    for (const result of effectResults) {
-      if (result.success && result.type === 'absorb' && result.value) {
+    const allResults = [
+      ...afterApplyResults,
+      ...receiveDamageResults,
+      ...afterSkillResults
+    ];
+    
+    for (const result of allResults) {
+      if (result.success && (result.type === 'absorb' || result.type === 'heal') && result.value) {
         gainHp += result.value;
       }
     }
 
-    // ==================== 技能使用后效果 ====================
-    const afterSkillEffects = EffectTrigger.TriggerSkillEffect(
-      skill,
-      attacker,
-      defender,
-      damage,
-      EffectTiming.AFTER_SKILL
-    );
-    EffectTrigger.ApplyEffectResults(afterSkillEffects, attacker, defender);
-
     // ==================== 返回攻击结果 ====================
-
+    // 注意：attackerStatus 应该在所有效果应用后获取，以包含新施加的状态
     return {
       userId: attackerUserId,
       skillId: skill.id,
       atkTimes: 1,
-      damage,
+      damage: actualDamage,
       gainHp,
       attackerRemainHp: attacker.hp,
       attackerMaxHp: attacker.maxHp,
+      defenderRemainHp: defender.hp,  // 被攻击者的HP
+      defenderMaxHp: defender.maxHp,  // 被攻击者的最大HP
       missed: false,
       blocked: false,
       isCrit,
-      attackerStatus: attacker.statusArray || [],
+      attackerStatus: attacker.statusArray || [],  // 攻击者的状态（在所有效果后）
       attackerBattleLv: attacker.battleLv || []
     };
   }
