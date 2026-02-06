@@ -19,6 +19,7 @@ import { Migration012FixAllTables } from './scripts/012_fix_all_tables';
 import { Migration013AddAllocatableExp } from './scripts/013_add_allocatable_exp';
 import { Migration008AlignNoNoFieldsWithOfficial } from './scripts/008_align_nono_fields_with_official';
 import { Migration014AddMessWinAndCurTitle } from './scripts/014_add_mess_win_and_cur_title';
+import { Migration016AddGoldField } from './scripts/016_add_gold_field';
 
 /**
  * 所有迁移脚本（按版本号排序）
@@ -37,6 +38,7 @@ const AllMigrations: IMigration[] = [
   new Migration013AddAllocatableExp(),
   new Migration008AlignNoNoFieldsWithOfficial(),
   new Migration014AddMessWinAndCurTitle(),
+  new Migration016AddGoldField(),
 ];
 
 export class MigrationRunner {

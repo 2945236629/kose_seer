@@ -42,7 +42,7 @@ export const ConfigPaths: Record<string, string> = {
   [ConfigKeys.MAP_OGRES]: 'data/json/map-ogres.json',
   [ConfigKeys.BATTLE_CONFIG]: 'game/battle-config.json',
   [ConfigKeys.TASK_CONFIG]: 'data/json/tasks.json',
-  [ConfigKeys.SHOP_CONFIG]: 'game/shop-config.json',
+  [ConfigKeys.SHOP_CONFIG]: 'data/json/shop.json',
   [ConfigKeys.DEFAULT_PLAYER]: 'data/json/default-player.json',
   
   // XML配置
@@ -99,6 +99,7 @@ export function GetGameConfigRegistrations(): Array<{ key: string; path: string;
     { key: ConfigKeys.MAP_OGRES, path: ConfigPaths[ConfigKeys.MAP_OGRES], type: ConfigTypes[ConfigKeys.MAP_OGRES] },
     { key: ConfigKeys.DEFAULT_PLAYER, path: ConfigPaths[ConfigKeys.DEFAULT_PLAYER], type: ConfigTypes[ConfigKeys.DEFAULT_PLAYER] },
     { key: ConfigKeys.TASK_CONFIG, path: ConfigPaths[ConfigKeys.TASK_CONFIG], type: ConfigTypes[ConfigKeys.TASK_CONFIG] },
+    { key: ConfigKeys.SHOP_CONFIG, path: ConfigPaths[ConfigKeys.SHOP_CONFIG], type: ConfigTypes[ConfigKeys.SHOP_CONFIG] },
     { key: ConfigKeys.PET_CONFIG, path: ConfigPaths[ConfigKeys.PET_CONFIG], type: ConfigTypes[ConfigKeys.PET_CONFIG] },
     { key: ConfigKeys.SKILL_CONFIG, path: ConfigPaths[ConfigKeys.SKILL_CONFIG], type: ConfigTypes[ConfigKeys.SKILL_CONFIG] },
     { key: ConfigKeys.ITEM_CONFIG, path: ConfigPaths[ConfigKeys.ITEM_CONFIG], type: ConfigTypes[ConfigKeys.ITEM_CONFIG] },
@@ -109,6 +110,5 @@ export function GetGameConfigRegistrations(): Array<{ key: string; path: string;
     { key: ConfigKeys.UNIQUE_ITEMS_CONFIG, path: ConfigPaths[ConfigKeys.UNIQUE_ITEMS_CONFIG], type: ConfigTypes[ConfigKeys.UNIQUE_ITEMS_CONFIG] },
     { key: ConfigKeys.SKILL_EFFECTS_V2, path: ConfigPaths[ConfigKeys.SKILL_EFFECTS_V2], type: ConfigTypes[ConfigKeys.SKILL_EFFECTS_V2] }
     //{ key: ConfigKeys.BATTLE_CONFIG, path: ConfigPaths[ConfigKeys.BATTLE_CONFIG], type: ConfigTypes[ConfigKeys.BATTLE_CONFIG] },
-    //{ key: ConfigKeys.SHOP_CONFIG, path: ConfigPaths[ConfigKeys.SHOP_CONFIG], type: ConfigTypes[ConfigKeys.SHOP_CONFIG] },
   ];
 }

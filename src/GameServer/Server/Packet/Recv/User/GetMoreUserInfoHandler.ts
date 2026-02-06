@@ -17,23 +17,23 @@ export class GetMoreUserInfoHandler implements IHandler {
     if (!player) return;
 
     const req = GetMoreUserInfoReqProto.fromBuffer(body);
-    
-    Logger.Info(`[GetMoreUserInfoHandler] 查询用户信息: RequesterId=${player.Data.userID}, TargetUserId=${req.userId}`);
 
     try {
-      // 获取目标用户的数据
-      let targetPlayerData;
-      
-      if (req.userId === player.Data.userID) {
-        // 查询自己的信息，直接使用当前玩家数据
-        targetPlayerData = player.Data;
-      } else {
-        // 查询其他玩家的信息，从数据库加载
+      // 获取目标用户的数据（跟GM一样的逻辑）
+      let targetPlayerData = await DatabaseHelper.Instance.GetInstance_PlayerData(req.userId);
+      if (!targetPlayerData) {
+        // 如果缓存中没有，从数据库加载
         targetPlayerData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PlayerData(req.userId);
+        if (!targetPlayerData) {
+          Logger.Warn(`[GetMoreUserInfoHandler] 玩家不存在: TargetUserId=${req.userId}`);
+          return;
+        }
       }
 
-      // 实时更新精灵统计信息（从数据库加载）
+      // 使用 GetInstanceOrCreateNew 从数据库加载精灵数据
       const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(req.userId);
+
+      // 实时更新精灵统计信息（跟GM一样）
       if (petData) {
         targetPlayerData.petAllNum = petData.PetList.length;
         if (petData.PetList.length > 0) {
@@ -41,13 +41,11 @@ export class GetMoreUserInfoHandler implements IHandler {
         } else {
           targetPlayerData.petMaxLev = 0;
         }
-        Logger.Debug(`[GetMoreUserInfoHandler] 更新精灵统计: UserId=${req.userId}, petAllNum=${targetPlayerData.petAllNum}, petMaxLev=${targetPlayerData.petMaxLev}`);
+        Logger.Info(`[GetMoreUserInfoHandler] 实时更新精灵统计: userId=${req.userId}, petAllNum=${targetPlayerData.petAllNum}, petMaxLev=${targetPlayerData.petMaxLev}`);
       }
 
       // 发送响应
       await player.SendPacket(new PacketGetMoreUserInfo(targetPlayerData));
-      
-      Logger.Info(`[GetMoreUserInfoHandler] 发送用户信息: TargetUserId=${req.userId}, Nick=${targetPlayerData.nick}, Pets=${targetPlayerData.petAllNum}`);
       
     } catch (error) {
       Logger.Error(`[GetMoreUserInfoHandler] 查询用户信息失败: TargetUserId=${req.userId}`, error as Error);

@@ -11401,6 +11401,3622 @@
         ]
       },
       "specialType": "iv_power"
+    },
+    {
+      "effectId": 1902,
+      "name": "免疫能力下降",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "BATTLE_START"
+      ],
+      "description": "免疫所有能力(battle_lv)下降效果",
+      "implemented": true,
+      "implementClass": "StatDownImmunityPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "composite",
+        "atoms": [
+          {
+            "type": "immune",
+            "immuneType": "stat_down"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any",
+        "immuneFlags": {
+          "statDown": true
+        }
+      },
+      "abilityConfig": {
+        "flags": [
+          "boss_stat_down_immunity"
+        ]
+      },
+      "notes": "BOSS特性1 - 被动能力，永久免疫所有能力下降"
+    },
+    {
+      "effectId": 1903,
+      "name": "免疫异常状态",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "BATTLE_START"
+      ],
+      "description": "免疫所有异常状态（麻痹、中毒、烧伤、冻伤、睡眠、害怕等）",
+      "implemented": true,
+      "implementClass": "StatusImmunityPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "composite",
+        "atoms": [
+          {
+            "type": "immune",
+            "immuneType": "status"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any",
+        "immuneFlags": {
+          "status": true
+        }
+      },
+      "abilityConfig": {
+        "flags": [
+          "boss_status_immunity"
+        ]
+      },
+      "notes": "BOSS特性2 - 被动能力，永久免疫所有异常状态"
+    },
+    {
+      "effectId": 1904,
+      "name": "受伤减免",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "受到任何伤害减免n%",
+      "implemented": true,
+      "implementClass": "DamageReductionPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "reductionPercent",
+          "type": "number",
+          "description": "伤害减免百分比（0-100）",
+          "default": 50
+        }
+      ],
+      "atomicComposition": {
+        "type": "composite",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "damage_reduction_passive",
+            "reductionPercent": 50
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "abilityConfig": {
+        "params": {
+          "boss_damage_reduction": {
+            "argIndex": 0,
+            "default": 50
+          }
+        }
+      },
+      "notes": "BOSS特性3 - 被动能力，永久减免所有受到的伤害"
+    },
+    {
+      "effectId": 1905,
+      "name": "同系吸收",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "受到与自身相同系属的攻击会恢复自身相应体力",
+      "implemented": true,
+      "implementClass": "SameTypeAbsorbPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "composite",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "same_type_absorb"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "abilityConfig": {
+        "flags": [
+          "boss_same_type_absorb"
+        ]
+      },
+      "notes": "BOSS特性4 - 被动能力，受到同属性攻击时回复等量体力而非受伤"
+    },
+    {
+      "effectId": 1906,
+      "name": "属性免疫",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "只受到来自普通属性和某类属性的攻击伤害（其他属性免疫）",
+      "implemented": true,
+      "implementClass": "TypeImmunityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "allowedType1",
+          "type": "number",
+          "description": "允许的属性类型1（mon_type: 1=草,2=水,3=火,4=飞行,5=电,6=机械,7=地面,8=普通,9=冰,10=超能,11=战斗,12=光,13=暗影,14=神秘,15=龙,16=圣灵）",
+          "default": 8
+        },
+        {
+          "index": 1,
+          "name": "allowedType2",
+          "type": "number",
+          "description": "允许的属性类型2（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "allowedType3",
+          "type": "number",
+          "description": "允许的属性类型3（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "allowedType4",
+          "type": "number",
+          "description": "允许的属性类型4（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "allowedType5",
+          "type": "number",
+          "description": "允许的属性类型5（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "allowedType6",
+          "type": "number",
+          "description": "允许的属性类型6（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "allowedType7",
+          "type": "number",
+          "description": "允许的属性类型7（mon_type，0表示无）",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "allowedType8",
+          "type": "number",
+          "description": "允许的属性类型8（mon_type，0表示无）",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "composite",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "type_immunity",
+            "typeList": [
+              8
+            ]
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "abilityConfig": {
+        "flags": [
+          "boss_type_immunity"
+        ],
+        "params": {
+          "boss_type_immunity_list": {
+            "argIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "default": [
+              8
+            ]
+          }
+        }
+      },
+      "notes": "BOSS特性5 - 被动能力，只受到指定属性的伤害，其他属性完全免疫。默认只允许普通属性(8)攻击。属性类型: 1=草,2=水,3=火,4=飞行,5=电,6=机械,7=地面,8=普通,9=冰,10=超能,11=战斗,12=光,13=暗影,14=神秘,15=龙,16=圣灵"
+    },
+    {
+      "effectId": 2006,
+      "name": "受击致异常",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到普通属性(128)伤害时以n%的概率使对方进入异常状态(仅一个异常状态)",
+      "implemented": true,
+      "implementClass": "OnHitStatusInflictPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statusType",
+          "type": "number",
+          "description": "异常状态类型(0,1,2,5,6,8,9,10,11,12,13,14)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比(0-100)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "on_hit_status_inflict",
+            "statusType": 0,
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性6 - 受到普通属性伤害时概率使对方进入异常状态"
+    },
+    {
+      "effectId": 2007,
+      "name": "闪避提升",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_ACCURACY_CHECK"
+      ],
+      "description": "任何技能对自身的命中率下降n%",
+      "implemented": true,
+      "implementClass": "AccuracyReductionPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "reducePercent",
+          "type": "number",
+          "description": "命中率下降百分比(0-100)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "accuracy_reduction_passive",
+            "reducePercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性7 - 被动降低对方对自身的命中率"
+    },
+    {
+      "effectId": 2008,
+      "name": "固定会心率",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "自身的会心一击率为n/16",
+      "implemented": true,
+      "implementClass": "FixedCritRatePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "critNumerator",
+          "type": "number",
+          "description": "会心率分子(0-16)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "fixed_crit_rate",
+            "critNumerator": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性8 - 固定会心一击率为n/16"
+    },
+    {
+      "effectId": 2009,
+      "name": "濒死回满",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "如果被打到BurstRecoverHP以下且没有挂掉则马上恢复到满HP",
+      "implemented": true,
+      "implementClass": "BurstRecoverFullHpPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "burstHpHigh",
+          "type": "number",
+          "description": "触发血量阈值高32位",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "burstHpLow",
+          "type": "number",
+          "description": "触发血量阈值低32位",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "burst_recover_full_hp"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性9 - 血量低于阈值时立即回满HP"
+    },
+    {
+      "effectId": 2010,
+      "name": "无限PP",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "BATTLE_START"
+      ],
+      "description": "无限PP值",
+      "implemented": true,
+      "implementClass": "InfinitePPPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "infinite_pp"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性10 - 技能PP值无限"
+    },
+    {
+      "effectId": 2011,
+      "name": "伤害反弹",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到任何攻击都会反弹1/n的伤害给对方",
+      "implemented": true,
+      "implementClass": "DamageReflectFractionPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "divisor",
+          "type": "number",
+          "description": "反弹伤害除数(反弹1/n)",
+          "default": 4
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "damage_reflect_fraction",
+            "divisor": 4
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性11 - 受到攻击时反弹1/n伤害"
+    },
+    {
+      "effectId": 2012,
+      "name": "受特攻提升能力",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到特殊攻击时使自身的一种battle_lv提升1个等级，可提升n次",
+      "implemented": true,
+      "implementClass": "OnSpHitStatUpPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statIndex",
+          "type": "number",
+          "description": "能力索引(0=atk,1=def,2=sp_atk,3=sp_def,4=spd,5=accuracy)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "maxTimes",
+          "type": "number",
+          "description": "最大提升次数",
+          "default": 6
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "on_sp_hit_stat_up",
+            "statIndex": 0,
+            "maxTimes": 6
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性12 - 受到特殊攻击时提升指定能力等级"
+    },
+    {
+      "effectId": 2013,
+      "name": "定时逃跑",
+      "argsNum": 4,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "n回合逃跑",
+      "implemented": true,
+      "implementClass": "EscapePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "turnCount",
+          "type": "number",
+          "description": "逃跑回合数",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "exceptPetId",
+          "type": "number",
+          "description": "不逃跑的精灵ID",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "exceptType1",
+          "type": "number",
+          "description": "遇到此系精灵时不逃跑",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "exceptType2",
+          "type": "number",
+          "description": "遇到此系精灵时不逃跑",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "timed_escape"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性13 - n回合后逃跑，遇到指定精灵/属性时不逃跑"
+    },
+    {
+      "effectId": 2014,
+      "name": "天敌害怕",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BATTLE_START"
+      ],
+      "description": "若遇到天敌，则战斗开始时连续害怕n回合",
+      "implemented": true,
+      "implementClass": "CounterFearPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "fearTurns",
+          "type": "number",
+          "description": "害怕回合数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "counter_fear",
+            "fearTurns": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性14 - 遇到天敌时战斗开始连续害怕n回合"
+    },
+    {
+      "effectId": 2015,
+      "name": "天敌伤害减少",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "若遇到天敌，则整个战斗中对天敌的伤害减少n%",
+      "implemented": true,
+      "implementClass": "CounterDamageReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "reducePercent",
+          "type": "number",
+          "description": "伤害减少百分比(0-100)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "counter_damage_reduce",
+            "reducePercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性15 - 遇到天敌时对天敌伤害减少n%"
+    },
+    {
+      "effectId": 2016,
+      "name": "血量绑定能力",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "HP与battle_lv的某一种绑定，自身体力每减少1/8则该battle_lv上升1个等级，最高到12",
+      "implemented": true,
+      "implementClass": "HpStatBindPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statIndex",
+          "type": "number",
+          "description": "绑定的能力索引(0=atk,1=def,2=sp_atk,3=sp_def,4=spd,5=accuracy)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "hp_stat_bind",
+            "statIndex": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性16 - 体力每减少1/8，指定能力等级上升1级，最高12"
+    },
+    {
+      "effectId": 2020,
+      "name": "技能破防",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "在被ID为xxx的技能命中前，任何技能都不能伤害自身",
+      "implemented": true,
+      "implementClass": "SkillUnlockShieldPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "skillId1",
+          "type": "number",
+          "description": "有效技能ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "skillId2",
+          "type": "number",
+          "description": "有效技能ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "skillId3",
+          "type": "number",
+          "description": "有效技能ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "skillId4",
+          "type": "number",
+          "description": "有效技能ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "skillId5",
+          "type": "number",
+          "description": "有效技能ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "skillId6",
+          "type": "number",
+          "description": "有效技能ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "skillId7",
+          "type": "number",
+          "description": "有效技能ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "skillId8",
+          "type": "number",
+          "description": "有效技能ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "skill_unlock_shield"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性20 - 必须先用指定技能命中才能对其造成伤害"
+    },
+    {
+      "effectId": 2021,
+      "name": "致死余1",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "除ID为xxx的技能外，任何能将自身体力降为0的技能都会使自身余下1体力",
+      "implemented": true,
+      "implementClass": "SurviveWith1HpPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "skillId1",
+          "type": "number",
+          "description": "能打死的技能ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "skillId2",
+          "type": "number",
+          "description": "能打死的技能ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "skillId3",
+          "type": "number",
+          "description": "能打死的技能ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "skillId4",
+          "type": "number",
+          "description": "能打死的技能ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "skillId5",
+          "type": "number",
+          "description": "能打死的技能ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "skillId6",
+          "type": "number",
+          "description": "能打死的技能ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "skillId7",
+          "type": "number",
+          "description": "能打死的技能ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "skillId8",
+          "type": "number",
+          "description": "能打死的技能ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "survive_with_1hp_unless_skill"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性21 - 除指定技能外，致死伤害只会使自身余下1HP"
+    },
+    {
+      "effectId": 2022,
+      "name": "受击伤害倍增",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "被打时受到直接攻击伤害提高至n倍",
+      "implemented": true,
+      "implementClass": "ReceivedDamageMultiplyPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "multiplier",
+          "type": "number",
+          "description": "伤害倍数",
+          "default": 2
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "received_damage_multiply",
+            "multiplier": 2
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性22 - 受到直接攻击伤害提高至n倍"
+    },
+    {
+      "effectId": 2023,
+      "name": "低血秒杀先手",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BEFORE_TURN_ORDER",
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "自身体力降到N以下时，每次攻击必定秒杀对方且必定先手",
+      "implemented": true,
+      "implementClass": "LowHpOhkoPriorityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "thresholdHigh",
+          "type": "number",
+          "description": "血量阈值高16位",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "thresholdLow",
+          "type": "number",
+          "description": "血量阈值低16位",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "low_hp_ohko_priority"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性23 - 体力低于阈值时攻击必定秒杀且先手"
+    },
+    {
+      "effectId": 2024,
+      "name": "技能闪避",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_ACCURACY_CHECK"
+      ],
+      "description": "对方用这些技能时，对自身的命中率为0(最多8个)",
+      "implemented": true,
+      "implementClass": "SkillDodgePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "skillId1",
+          "type": "number",
+          "description": "打不中的技能ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "skillId2",
+          "type": "number",
+          "description": "打不中的技能ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "skillId3",
+          "type": "number",
+          "description": "打不中的技能ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "skillId4",
+          "type": "number",
+          "description": "打不中的技能ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "skillId5",
+          "type": "number",
+          "description": "打不中的技能ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "skillId6",
+          "type": "number",
+          "description": "打不中的技能ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "skillId7",
+          "type": "number",
+          "description": "打不中的技能ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "skillId8",
+          "type": "number",
+          "description": "打不中的技能ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "skill_dodge"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性24 - 指定技能对自身命中率为0"
+    },
+    {
+      "effectId": 2025,
+      "name": "死亡回血",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "如果HP被打成0，则立刻增加一些HP",
+      "implemented": true,
+      "implementClass": "ReviveOnDeathPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "revive_on_death"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性25 - HP归零时立刻恢复一些HP"
+    },
+    {
+      "effectId": 2026,
+      "name": "固定属性加成",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BATTLE_START"
+      ],
+      "description": "给一种battle_attr增加固定n点属性值",
+      "implemented": true,
+      "implementClass": "FlatStatBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "attrType",
+          "type": "number",
+          "description": "属性类型(battle_attr)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "value",
+          "type": "number",
+          "description": "增加的属性值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "flat_stat_bonus",
+            "attrType": 0,
+            "value": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性26 - 给指定属性增加固定点数"
+    },
+    {
+      "effectId": 2027,
+      "name": "属性顺序破防",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "按一定的属性顺序出招的技能才能造成伤害",
+      "implemented": true,
+      "implementClass": "TypeSequenceShieldPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "type1",
+          "type": "number",
+          "description": "属性顺序1(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "type2",
+          "type": "number",
+          "description": "属性顺序2(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "type3",
+          "type": "number",
+          "description": "属性顺序3(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "type4",
+          "type": "number",
+          "description": "属性顺序4(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "type5",
+          "type": "number",
+          "description": "属性顺序5(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "type6",
+          "type": "number",
+          "description": "属性顺序6(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "type7",
+          "type": "number",
+          "description": "属性顺序7(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "type8",
+          "type": "number",
+          "description": "属性顺序8(mon_type)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "type_sequence_shield"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性27 - 必须按指定属性顺序出招才能造成伤害"
+    },
+    {
+      "effectId": 2028,
+      "name": "属性伤害加成",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "XX系技能伤害增加n%",
+      "implemented": true,
+      "implementClass": "TypeDamageBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "elementType",
+          "type": "number",
+          "description": "属性类型(mon_type)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "bonusPercent",
+          "type": "number",
+          "description": "伤害增加百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "type_damage_bonus",
+            "elementType": 0,
+            "bonusPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性28 - 指定属性技能伤害增加n%"
+    },
+    {
+      "effectId": 2029,
+      "name": "命中率提升",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_ACCURACY_CHECK"
+      ],
+      "description": "自身的所有技能命中率增加n%",
+      "implemented": true,
+      "implementClass": "AccuracyBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "bonusPercent",
+          "type": "number",
+          "description": "命中率增加百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "accuracy_bonus",
+            "bonusPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性29 - 所有技能命中率增加n%"
+    },
+    {
+      "effectId": 2030,
+      "name": "会心率提升",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "所有技能的致命一击率增加n/16",
+      "implemented": true,
+      "implementClass": "CritRateBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "critBonus",
+          "type": "number",
+          "description": "致命一击率增加(n/16)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "crit_rate_bonus",
+            "critBonus": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性30 - 所有技能致命一击率增加n/16"
+    },
+    {
+      "effectId": 2031,
+      "name": "致死存活",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "受到致死攻击时有n%几率余下m点体力",
+      "implemented": true,
+      "implementClass": "SurviveLethalChancePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "remainHp",
+          "type": "number",
+          "description": "余下体力值",
+          "default": 1
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "survive_lethal_chance",
+            "chance": 0,
+            "remainHp": 1
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性31 - 致死攻击时有概率余下指定体力"
+    },
+    {
+      "effectId": 2033,
+      "name": "低血概率回满",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "精灵体力降低到1/n时有m%几率体力回满",
+      "implemented": true,
+      "implementClass": "LowHpFullHealChancePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "hpFraction",
+          "type": "number",
+          "description": "体力阈值(1/n的n)",
+          "default": 4
+        },
+        {
+          "index": 1,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "low_hp_full_heal_chance",
+            "hpFraction": 4,
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性33 - 体力降到1/n时有概率回满"
+    },
+    {
+      "effectId": 2034,
+      "name": "受特攻降对方能力",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到特殊攻击时有n%几率使对方battle_lv降低1个等级",
+      "implemented": true,
+      "implementClass": "OnSpHitEnemyStatDownPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statIndex",
+          "type": "number",
+          "description": "能力索引(0=atk,1=def,2=sp_atk,3=sp_def,4=spd,5=accuracy)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "on_sp_hit_enemy_stat_down",
+            "statIndex": 0,
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性34 - 受到特殊攻击时概率降低对方能力等级"
+    },
+    {
+      "effectId": 2035,
+      "name": "受击自身提升能力",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到任何攻击时有n%几率使自身battle_lv提升1个等级",
+      "implemented": true,
+      "implementClass": "OnHitSelfStatUpPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statIndex",
+          "type": "number",
+          "description": "能力索引(0=atk,1=def,2=sp_atk,3=sp_def,4=spd,5=accuracy)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "on_hit_self_stat_up",
+            "statIndex": 0,
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性35 - 受到攻击时概率提升自身能力等级"
+    },
+    {
+      "effectId": 2036,
+      "name": "轮换属性护盾",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "按5回合轮换属性顺序出招的技能才能造成伤害",
+      "implemented": true,
+      "implementClass": "RotatingTypeShieldPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "type1",
+          "type": "number",
+          "description": "属性/状态1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "type2",
+          "type": "number",
+          "description": "属性/状态2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "type3",
+          "type": "number",
+          "description": "属性/状态3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "type4",
+          "type": "number",
+          "description": "属性/状态4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "type5",
+          "type": "number",
+          "description": "属性/状态5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "type6",
+          "type": "number",
+          "description": "属性/状态6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "type7",
+          "type": "number",
+          "description": "属性/状态7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "type8",
+          "type": "number",
+          "description": "属性/状态8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "rotating_type_shield"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性36 - 按5回合轮换属性顺序出招才能造成伤害"
+    },
+    {
+      "effectId": 2037,
+      "name": "高伤反杀",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "自身一次受到大于n的伤害时直接将对方体力降至0",
+      "implemented": true,
+      "implementClass": "HighDamageCounterKillPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "thresholdHigh",
+          "type": "number",
+          "description": "伤害阈值高16位",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "thresholdLow",
+          "type": "number",
+          "description": "伤害阈值低16位",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "high_damage_counter_kill"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性37 - 受到超过阈值的伤害时直接秒杀对方"
+    },
+    {
+      "effectId": 2038,
+      "name": "伤害增加",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "自身造成的伤害增加n%",
+      "implemented": true,
+      "implementClass": "DamageBonusPercentPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "bonusPercent",
+          "type": "number",
+          "description": "伤害增加百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "damage_bonus_percent",
+            "bonusPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性38 - 自身造成伤害增加n%"
+    },
+    {
+      "effectId": 2039,
+      "name": "偶数伤害倍增",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "偶数伤害(dmg)提升到n*dmg",
+      "implemented": true,
+      "implementClass": "EvenDamageMultiplyPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "multiplier",
+          "type": "number",
+          "description": "伤害倍数",
+          "default": 2
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "even_damage_multiply",
+            "multiplier": 2
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性39 - 偶数伤害提升到n倍"
+    },
+    {
+      "effectId": 2040,
+      "name": "奇数伤害削减",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "奇数伤害(dmg)改为1/n*dmg",
+      "implemented": true,
+      "implementClass": "OddDamageDividePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "divisor",
+          "type": "number",
+          "description": "伤害除数",
+          "default": 2
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "odd_damage_divide",
+            "divisor": 2
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性40 - 奇数伤害削减为1/n"
+    },
+    {
+      "effectId": 2041,
+      "name": "每回合回血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "每回合恢复自身n点体力",
+      "implemented": true,
+      "implementClass": "TurnEndHealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "healAmount",
+          "type": "number",
+          "description": "每回合恢复体力值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "turn_end_heal",
+            "healAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性41 - 每回合恢复固定体力"
+    },
+    {
+      "effectId": 2042,
+      "name": "先制变化",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_TURN_ORDER"
+      ],
+      "description": "自身所有技能先制改变n(+/-)",
+      "implemented": true,
+      "implementClass": "PriorityChangePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "priorityChange",
+          "type": "number",
+          "description": "先制变化值(正数增加/负数减少)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "priority_change",
+            "priorityChange": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性42 - 所有技能先制值改变n"
+    },
+    {
+      "effectId": 2043,
+      "name": "天敌先制降低",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_TURN_ORDER"
+      ],
+      "description": "遇到天敌自身所有技能先制减少n",
+      "implemented": true,
+      "implementClass": "CounterPriorityReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "priorityReduce",
+          "type": "number",
+          "description": "先制减少值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "counter_priority_reduce",
+            "priorityReduce": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性43 - 遇到天敌时所有技能先制减少n"
+    },
+    {
+      "effectId": 2044,
+      "name": "重生",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "重生(HP和btl_maxhp恢复到maxhp+maxhp_adj，技能PP值回满)",
+      "implemented": true,
+      "implementClass": "ReviveFullPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "maxRevives",
+          "type": "number",
+          "description": "可重生次数",
+          "default": 1
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "revive_full",
+            "maxRevives": 1
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性44 - 死亡后重生，HP和PP全恢复，可重生n次"
+    },
+    {
+      "effectId": 2045,
+      "name": "固定致命率",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "自身所有技能致命一击率固定是1/n",
+      "implemented": true,
+      "implementClass": "FixedCritDivisorPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "critDivisor",
+          "type": "number",
+          "description": "致命率分母(16/n)",
+          "default": 16
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "fixed_crit_divisor",
+            "critDivisor": 16
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性45 - 所有技能致命一击率固定为1/n"
+    },
+    {
+      "effectId": 2046,
+      "name": "五回合不死",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "若自身5回合内体力被降到0会余下1点体力，并且体力全恢复，恢复后回合数重新计算",
+      "implemented": true,
+      "implementClass": "FiveTurnImmortalPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "five_turn_immortal"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性46 - 5回合内致死伤害余1HP并全恢复，循环计算"
+    },
+    {
+      "effectId": 2047,
+      "name": "双方伤害降低",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "敌我双方伤害降低n%",
+      "implemented": true,
+      "implementClass": "BothDamageReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "reducePercent",
+          "type": "number",
+          "description": "伤害降低百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "both_damage_reduce",
+            "reducePercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性47 - 敌我双方伤害降低n%"
+    },
+    {
+      "effectId": 2048,
+      "name": "攻击类型无效",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "对方某种攻击类型无效",
+      "implemented": true,
+      "implementClass": "AttackTypeImmunePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "attackType",
+          "type": "number",
+          "description": "无效的攻击类型",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "attack_type_immune",
+            "attackType": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性48 - 对方某种攻击类型无效"
+    },
+    {
+      "effectId": 2049,
+      "name": "受击后减伤",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到物理攻击或特殊攻击后，下n回合受物理攻击或特殊攻击伤害减免m%",
+      "implemented": true,
+      "implementClass": "PostHitDamageReductionPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "duration",
+          "type": "number",
+          "description": "持续回合数",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "reducePercent",
+          "type": "number",
+          "description": "伤害减免百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "post_hit_damage_reduction",
+            "duration": 0,
+            "reducePercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性49 - 受到攻击后下n回合减免m%伤害"
+    },
+    {
+      "effectId": 2050,
+      "name": "免疫特效",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_EFFECT_APPLY"
+      ],
+      "description": "免疫某类特效",
+      "implemented": true,
+      "implementClass": "EffectImmunityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "effectId1",
+          "type": "number",
+          "description": "被免疫的特效ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "effectId2",
+          "type": "number",
+          "description": "被免疫的特效ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "effectId3",
+          "type": "number",
+          "description": "被免疫的特效ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "effectId4",
+          "type": "number",
+          "description": "被免疫的特效ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "effectId5",
+          "type": "number",
+          "description": "被免疫的特效ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "effectId6",
+          "type": "number",
+          "description": "被免疫的特效ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "effectId7",
+          "type": "number",
+          "description": "被免疫的特效ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "effectId8",
+          "type": "number",
+          "description": "被免疫的特效ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "effect_immunity"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性50 - 免疫指定特效ID"
+    },
+    {
+      "effectId": 2051,
+      "name": "濒死回满含PP",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "如果被打到BurstRecoverHP以下且没有挂掉则马上恢复到满HP和PP值",
+      "implemented": true,
+      "implementClass": "BurstRecoverFullHpPpPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "burstHpHigh",
+          "type": "number",
+          "description": "触发血量阈值高32位",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "burstHpLow",
+          "type": "number",
+          "description": "触发血量阈值低32位",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "burst_recover_full_hp_pp"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性51 - 血量低于阈值时立即回满HP和PP"
+    },
+    {
+      "effectId": 2052,
+      "name": "轮换免疫",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "TURN_START"
+      ],
+      "description": "第3n+1回合免疫特殊攻击，第3n+2回合免疫物理攻击，第3n+3回合免疫属性攻击",
+      "implemented": true,
+      "implementClass": "RotatingAttackImmunityPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "rotating_attack_immunity"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性52 - 按3回合轮换免疫不同攻击类型"
+    },
+    {
+      "effectId": 2053,
+      "name": "双方回血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "敌我双方每回合恢复n%HP(不超过最大血量)",
+      "implemented": true,
+      "implementClass": "BothTurnHealPercentPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "healPercent",
+          "type": "number",
+          "description": "恢复HP百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "both_turn_heal_percent",
+            "healPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性53 - 敌我双方每回合恢复n%HP"
+    },
+    {
+      "effectId": 2054,
+      "name": "双方扣血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "每回合结束后，敌我双方扣除n体力值",
+      "implemented": true,
+      "implementClass": "BothTurnDamagePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "damageAmount",
+          "type": "number",
+          "description": "每回合扣除体力值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "both_turn_damage",
+            "damageAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性54 - 每回合敌我双方扣除固定体力"
+    },
+    {
+      "effectId": 2055,
+      "name": "双方伤害倍增",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "每回合敌我双方造成的伤害为原来的n倍",
+      "implemented": true,
+      "implementClass": "BothDamageMultiplyPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "multiplier",
+          "type": "number",
+          "description": "伤害倍数",
+          "default": 2
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "both_damage_multiply",
+            "multiplier": 2
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性55 - 敌我双方伤害倍增n倍"
+    },
+    {
+      "effectId": 2056,
+      "name": "定时秒杀",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "TURN_START"
+      ],
+      "description": "第n回合秒杀敌人",
+      "implemented": true,
+      "implementClass": "TimedOhkoPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "turnNumber",
+          "type": "number",
+          "description": "秒杀回合数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "timed_ohko",
+            "turnNumber": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性56 - 第n回合秒杀敌人"
+    },
+    {
+      "effectId": 2057,
+      "name": "异常状态暴击",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "如果对方存在某异常状态，则自己攻击的致命一击率提高n/16",
+      "implemented": true,
+      "implementClass": "StatusCritBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statusType",
+          "type": "number",
+          "description": "异常状态类型(0,1,2,5,6,8,9)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "critBonus",
+          "type": "number",
+          "description": "致命一击率提高(n/16)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "status_crit_bonus",
+            "statusType": 0,
+            "critBonus": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性57 - 对方有异常状态时致命一击率提高"
+    },
+    {
+      "effectId": 2058,
+      "name": "魔王愤怒",
+      "argsNum": 6,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "按一定条件触发魔王的愤怒，触发时战斗等级提升至一定状态，可以被消强化恢复至正常状态(+6)",
+      "implemented": true,
+      "implementClass": "BossRagePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "atkLevel",
+          "type": "number",
+          "description": "攻击等级(0-12,-1不设置)",
+          "default": -1
+        },
+        {
+          "index": 1,
+          "name": "defLevel",
+          "type": "number",
+          "description": "防御等级(0-12,-1不设置)",
+          "default": -1
+        },
+        {
+          "index": 2,
+          "name": "spAtkLevel",
+          "type": "number",
+          "description": "特攻等级(0-12,-1不设置)",
+          "default": -1
+        },
+        {
+          "index": 3,
+          "name": "spDefLevel",
+          "type": "number",
+          "description": "特防等级(0-12,-1不设置)",
+          "default": -1
+        },
+        {
+          "index": 4,
+          "name": "spdLevel",
+          "type": "number",
+          "description": "速度等级(0-12,-1不设置)",
+          "default": -1
+        },
+        {
+          "index": 5,
+          "name": "accLevel",
+          "type": "number",
+          "description": "命中等级(0-12,-1不设置)",
+          "default": -1
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "boss_rage"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性58 - 条件触发魔王愤怒，提升战斗等级"
+    },
+    {
+      "effectId": 2059,
+      "name": "魔王附身",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "按一定条件触发魔王的附身，触发时受到伤害时n回合内反弹m%伤害给玩家",
+      "implemented": true,
+      "implementClass": "BossPossessionPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "duration",
+          "type": "number",
+          "description": "持续回合数",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "reflectPercent",
+          "type": "number",
+          "description": "反弹伤害百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "boss_possession",
+            "duration": 0,
+            "reflectPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性59 - 条件触发魔王附身，反弹伤害"
+    },
+    {
+      "effectId": 2060,
+      "name": "概率减伤",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "受到攻击时n%几率使受到的伤害降低m点",
+      "implemented": true,
+      "implementClass": "ChanceDamageFlatReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "reduceAmount",
+          "type": "number",
+          "description": "伤害降低点数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "chance_damage_flat_reduce",
+            "chance": 0,
+            "reduceAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性60 - 受到攻击时概率降低固定伤害"
+    },
+    {
+      "effectId": 2061,
+      "name": "概率完全抵挡",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "n%几率完全抵挡一次伤害",
+      "implemented": true,
+      "implementClass": "ChanceFullBlockPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "chance_full_block",
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性61 - 概率完全抵挡一次伤害"
+    },
+    {
+      "effectId": 2062,
+      "name": "物攻概率加伤",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "物理攻击有n%几率使伤害提高m点",
+      "implemented": true,
+      "implementClass": "PhysChanceDamageBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "bonusAmount",
+          "type": "number",
+          "description": "伤害提高点数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "phys_chance_damage_bonus",
+            "chance": 0,
+            "bonusAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性62 - 物理攻击概率提高固定伤害"
+    },
+    {
+      "effectId": 2063,
+      "name": "特攻概率加伤",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "特殊攻击有n%几率使伤害提高m点",
+      "implemented": true,
+      "implementClass": "SpChanceDamageBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "bonusAmount",
+          "type": "number",
+          "description": "伤害提高点数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "sp_chance_damage_bonus",
+            "chance": 0,
+            "bonusAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性63 - 特殊攻击概率提高固定伤害"
+    },
+    {
+      "effectId": 2064,
+      "name": "致命率降低",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "受到致命一击的概率降低n/16",
+      "implemented": true,
+      "implementClass": "CritRateReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "critReduce",
+          "type": "number",
+          "description": "致命率降低(n/16)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "crit_rate_reduce",
+            "critReduce": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性64 - 受到致命一击概率降低n/16"
+    },
+    {
+      "effectId": 2065,
+      "name": "物攻或特攻加伤",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "物理攻击或特殊攻击伤害增加m%",
+      "implemented": true,
+      "implementClass": "AttackTypeDamageBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "attackType",
+          "type": "number",
+          "description": "攻击类型(1=物理,3=特殊)",
+          "default": 1
+        },
+        {
+          "index": 1,
+          "name": "bonusPercent",
+          "type": "number",
+          "description": "伤害增加百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "attack_type_damage_bonus",
+            "attackType": 1,
+            "bonusPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性65 - 物理或特殊攻击伤害增加m%"
+    },
+    {
+      "effectId": 2066,
+      "name": "物攻致异常",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "自身的物攻有n%几率使对方处于异常状态",
+      "implemented": true,
+      "implementClass": "PhysHitStatusInflictPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "statusType",
+          "type": "number",
+          "description": "异常状态类型(0,1,2,5,6,8,9,10,11,12,13,14)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "phys_hit_status_inflict",
+            "chance": 0,
+            "statusType": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性66 - 物理攻击概率使对方进入异常状态"
+    },
+    {
+      "effectId": 2067,
+      "name": "特攻致异常",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "自身的特攻有n%几率使对方处于异常状态",
+      "implemented": true,
+      "implementClass": "SpHitStatusInflictPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "statusType",
+          "type": "number",
+          "description": "异常状态类型(0,1,2,5,6,8,9,10,11,12,13,14)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "sp_hit_status_inflict",
+            "chance": 0,
+            "statusType": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性67 - 特殊攻击概率使对方进入异常状态"
+    },
+    {
+      "effectId": 2068,
+      "name": "特定系吸收",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_CALC"
+      ],
+      "description": "受到特定系的攻击会恢复自身相应体力",
+      "implemented": true,
+      "implementClass": "SpecificTypeAbsorbPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "elementType",
+          "type": "number",
+          "description": "特定系属性(mon_type)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "specific_type_absorb",
+            "elementType": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性68 - 受到特定属性攻击时恢复体力"
+    },
+    {
+      "effectId": 2069,
+      "name": "性别伤害加成",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "目标为n性别时，所有攻击伤害增加m%",
+      "implemented": true,
+      "implementClass": "GenderDamageBonusPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "gender",
+          "type": "number",
+          "description": "目标性别",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "bonusPercent",
+          "type": "number",
+          "description": "伤害增加百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "gender_damage_bonus",
+            "gender": 0,
+            "bonusPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性69 - 对指定性别目标伤害增加"
+    },
+    {
+      "effectId": 2070,
+      "name": "复制强化",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "AFTER_STAT_CHANGE"
+      ],
+      "description": "对手的能力提升效果会同时作用到自己身上",
+      "implemented": true,
+      "implementClass": "CopyEnemyBuffPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "copy_enemy_buff"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性70 - 复制对手的能力提升效果"
+    },
+    {
+      "effectId": 2071,
+      "name": "回合吸血",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "每回合结束时，对手降低n体力，自身恢复m体力",
+      "implemented": true,
+      "implementClass": "TurnDrainPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "enemyDamage",
+          "type": "number",
+          "description": "对手每回合损失体力",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "selfHeal",
+          "type": "number",
+          "description": "自身每回合恢复体力",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "turn_drain",
+            "enemyDamage": 0,
+            "selfHeal": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性71 - 每回合对手扣血自身回血"
+    },
+    {
+      "effectId": 2072,
+      "name": "低伤回血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到的伤害低于n时，则在受到伤害后恢复自身n点体力值",
+      "implemented": true,
+      "implementClass": "LowDamageHealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "threshold",
+          "type": "number",
+          "description": "伤害阈值(低于此值触发回血)",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "low_damage_heal",
+            "threshold": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性72 - 受到低于阈值的伤害时恢复等量体力"
+    },
+    {
+      "effectId": 2073,
+      "name": "伤害吸血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "给对方造成的伤害会恢复自身n%体力",
+      "implemented": true,
+      "implementClass": "DamageLifestealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "healPercent",
+          "type": "number",
+          "description": "恢复伤害百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "damage_lifesteal",
+            "healPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性73 - 造成伤害时恢复自身n%体力"
+    },
+    {
+      "effectId": 2074,
+      "name": "命中叠衰弱",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "每次物理或特殊攻击命中对手后，有百分之n的概率给对手叠加一层衰弱",
+      "implemented": true,
+      "implementClass": "HitStackWeaknessPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "hit_stack_weakness",
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性74 - 命中后概率叠加衰弱"
+    },
+    {
+      "effectId": 2075,
+      "name": "差异回血",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "每回合敌方恢复m%HP，我方恢复n%HP(不超过最大血量)",
+      "implemented": true,
+      "implementClass": "AsymmetricTurnHealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "enemyHealPercent",
+          "type": "number",
+          "description": "敌方恢复HP百分比",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "selfHealPercent",
+          "type": "number",
+          "description": "我方恢复HP百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "asymmetric_turn_heal",
+            "enemyHealPercent": 0,
+            "selfHealPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性75 - 敌我双方每回合恢复不同比例HP"
+    },
+    {
+      "effectId": 2076,
+      "name": "自身伤害削减",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "减少自身n%的攻击伤害",
+      "implemented": true,
+      "implementClass": "SelfDamageReducePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "reducePercent",
+          "type": "number",
+          "description": "伤害减少百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "self_damage_reduce",
+            "reducePercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性76 - 减少自身攻击伤害n%"
+    },
+    {
+      "effectId": 2077,
+      "name": "每回合扣敌血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "TURN_END"
+      ],
+      "description": "每回合损失对手n点体力",
+      "implemented": true,
+      "implementClass": "TurnEnemyDamagePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "damageAmount",
+          "type": "number",
+          "description": "每回合对手损失体力",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "turn_enemy_damage",
+            "damageAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "any"
+      },
+      "notes": "BOSS特性77 - 每回合对手损失固定体力"
+    },
+    {
+      "effectId": 2078,
+      "name": "受特攻致异常",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到特殊攻击伤害时以n%的概率使对方进入异常状态(仅一个异常状态)",
+      "implemented": true,
+      "implementClass": "OnSpHitStatusInflictPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "statusType",
+          "type": "number",
+          "description": "异常状态类型(0,1,2,5,6,8,9,10,11,12,13,14)",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "chance",
+          "type": "number",
+          "description": "触发概率百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "on_sp_hit_status_inflict",
+            "statusType": 0,
+            "chance": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性78 - 受到特殊攻击时概率使对方进入异常状态"
+    },
+    {
+      "effectId": 2079,
+      "name": "高伤下招翻倍",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到超过n的伤害时，下一招威力翻倍",
+      "implemented": true,
+      "implementClass": "HighDamageNextDoublePassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "threshold",
+          "type": "number",
+          "description": "伤害阈值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "high_damage_next_double",
+            "threshold": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性79 - 受到超过阈值伤害时下一招威力翻倍"
+    },
+    {
+      "effectId": 2080,
+      "name": "高伤回血",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到超过n的伤害时，恢复m体力",
+      "implemented": true,
+      "implementClass": "HighDamageHealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "threshold",
+          "type": "number",
+          "description": "伤害阈值",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "healAmount",
+          "type": "number",
+          "description": "恢复体力值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "high_damage_heal",
+            "threshold": 0,
+            "healAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性80 - 受到超过阈值伤害时恢复体力"
+    },
+    {
+      "effectId": 2081,
+      "name": "低血守护",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "体力低于n%时，每次受到伤害都会使自身进入山神守护状态，接下来m回合受到伤害减免90%",
+      "implemented": true,
+      "implementClass": "LowHpGuardianPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "hpPercent",
+          "type": "number",
+          "description": "体力百分比阈值",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "duration",
+          "type": "number",
+          "description": "守护持续回合数",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "low_hp_guardian",
+            "hpPercent": 0,
+            "duration": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性81 - 低血时受伤触发守护状态，减免90%伤害"
+    },
+    {
+      "effectId": 2082,
+      "name": "闪避回血",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_ACCURACY_CHECK"
+      ],
+      "description": "每躲避一次攻击，该回合结束后会回复n体力",
+      "implemented": true,
+      "implementClass": "DodgeHealPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "healAmount",
+          "type": "number",
+          "description": "躲避后恢复体力值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "dodge_heal",
+            "healAmount": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性82 - 躲避攻击后回复体力"
+    },
+    {
+      "effectId": 2083,
+      "name": "高伤反弹",
+      "argsNum": 2,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到超过n的伤害时，反弹m%伤害",
+      "implemented": true,
+      "implementClass": "HighDamageReflectPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "threshold",
+          "type": "number",
+          "description": "伤害阈值",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "reflectPercent",
+          "type": "number",
+          "description": "反弹伤害百分比",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "high_damage_reflect",
+            "threshold": 0,
+            "reflectPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性83 - 受到超过阈值伤害时反弹m%伤害"
+    },
+    {
+      "effectId": 2097,
+      "name": "低血必先手",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "BEFORE_TURN_ORDER"
+      ],
+      "description": "体力低于n%时，必定先手",
+      "implemented": true,
+      "implementClass": "LowHpPriorityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "hpPercent",
+          "type": "number",
+          "description": "体力百分比阈值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "low_hp_priority",
+            "hpPercent": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性97 - 体力低于n%时必定先手"
+    },
+    {
+      "effectId": 2098,
+      "name": "高伤下回合先手",
+      "argsNum": 1,
+      "category": "passive",
+      "timing": [
+        "AFTER_DAMAGE_APPLY"
+      ],
+      "description": "受到超过n的伤害时，下回合必定先出手",
+      "implemented": true,
+      "implementClass": "HighDamageNextPriorityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "threshold",
+          "type": "number",
+          "description": "伤害阈值",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "high_damage_next_priority",
+            "threshold": 0
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性98 - 受到超过阈值伤害时下回合必定先手"
+    },
+    {
+      "effectId": 2185,
+      "name": "免疫指定技能特效",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_EFFECT_APPLY"
+      ],
+      "description": "免疫指定技能特效",
+      "implemented": true,
+      "implementClass": "SkillEffectImmunityPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "skillId1",
+          "type": "number",
+          "description": "有效技能ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "skillId2",
+          "type": "number",
+          "description": "有效技能ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "skillId3",
+          "type": "number",
+          "description": "有效技能ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "skillId4",
+          "type": "number",
+          "description": "有效技能ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "skillId5",
+          "type": "number",
+          "description": "有效技能ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "skillId6",
+          "type": "number",
+          "description": "有效技能ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "skillId7",
+          "type": "number",
+          "description": "有效技能ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "skillId8",
+          "type": "number",
+          "description": "有效技能ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "skill_effect_immunity"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "defender"
+      },
+      "notes": "BOSS特性185 - 免疫指定技能的特效"
+    },
+    {
+      "effectId": 2205,
+      "name": "属性秒杀",
+      "argsNum": 8,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "遇到指定精灵属性，所有技能必定秒杀",
+      "implemented": true,
+      "implementClass": "TypeOhkoPassive",
+      "args": [
+        {
+          "index": 0,
+          "name": "type1",
+          "type": "number",
+          "description": "精灵属性ID1",
+          "default": 0
+        },
+        {
+          "index": 1,
+          "name": "type2",
+          "type": "number",
+          "description": "精灵属性ID2",
+          "default": 0
+        },
+        {
+          "index": 2,
+          "name": "type3",
+          "type": "number",
+          "description": "精灵属性ID3",
+          "default": 0
+        },
+        {
+          "index": 3,
+          "name": "type4",
+          "type": "number",
+          "description": "精灵属性ID4",
+          "default": 0
+        },
+        {
+          "index": 4,
+          "name": "type5",
+          "type": "number",
+          "description": "精灵属性ID5",
+          "default": 0
+        },
+        {
+          "index": 5,
+          "name": "type6",
+          "type": "number",
+          "description": "精灵属性ID6",
+          "default": 0
+        },
+        {
+          "index": 6,
+          "name": "type7",
+          "type": "number",
+          "description": "精灵属性ID7",
+          "default": 0
+        },
+        {
+          "index": 7,
+          "name": "type8",
+          "type": "number",
+          "description": "精灵属性ID8",
+          "default": 0
+        }
+      ],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "type_ohko"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性205 - 遇到指定属性精灵时所有技能必定秒杀"
+    },
+    {
+      "effectId": 2772,
+      "name": "命中消回合效果",
+      "argsNum": 0,
+      "category": "passive",
+      "timing": [
+        "BEFORE_DAMAGE_CALC"
+      ],
+      "description": "技能命中前消除对手回合类效果",
+      "implemented": true,
+      "implementClass": "ClearEnemyTurnEffectsPassive",
+      "args": [],
+      "atomicComposition": {
+        "type": "atomic",
+        "atoms": [
+          {
+            "type": "special",
+            "specialType": "clear_enemy_turn_effects"
+          }
+        ]
+      },
+      "passiveConfig": {
+        "role": "attacker"
+      },
+      "notes": "BOSS特性772 - 技能命中前消除对手的回合类效果"
     }
   ]
 }

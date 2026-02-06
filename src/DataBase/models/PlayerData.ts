@@ -54,7 +54,8 @@ export class PlayerData implements IPlayerInfo {
 
   // ============ 货币信息 ============
   energy: number;
-  coins: number;
+  coins: number;      // 赛尔豆
+  gold: number;       // 金豆（充值货币）
   fightBadge: number;
 
   // ============ 精灵分配仪 ============
@@ -185,6 +186,7 @@ export class PlayerData implements IPlayerInfo {
     // 货币信息
     this.energy = data.energy;
     this.coins = data.coins;
+    this.gold = data.gold || 0;
     this.fightBadge = data.fightBadge;
 
     // 精灵分配仪

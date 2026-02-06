@@ -591,30 +591,42 @@ export class PetManager extends BaseManager {
         return;
       }
 
-      // 5. 扣除可分配经验（自动保存）
-      this.Player.Data.allocatableExp -= expAmount;
+      // 5. 记录初始经验
+      const initialExp = pet.exp;
+      const oldLevel = pet.level;
 
       // 6. 增加精灵经验并检查升级
-      const oldLevel = pet.level;
       pet.exp += expAmount;
       const result = this.checkLevelUp(pet);
       const newLevel = pet.level;
 
-      // 7. 自动触发保存（通过深度 Proxy）
+      // 7. 计算实际消耗的经验（如果满级，剩余经验会留在 pet.exp 中）
+      let actualUsedExp = expAmount;
+      if (pet.level >= 100) {
+        // 精灵满级，计算实际使用的经验
+        // 满级后 pet.exp 应该为 0，多余的经验需要返还
+        const excessExp = pet.exp;
+        actualUsedExp = expAmount - excessExp;
+        pet.exp = 0; // 满级精灵经验归零
+        Logger.Info(`[PetManager] 精灵满级，返还剩余经验: ExcessExp=${excessExp}, ActualUsed=${actualUsedExp}`);
+      }
 
-      Logger.Info(`[PetManager] 分配经验后: UserID=${this.UserID}, PetId=${pet.petId}, Level=${newLevel}, Exp=${pet.exp}, AllocExp=${this.Player.Data.allocatableExp}`);
+      // 8. 扣除实际消耗的可分配经验（自动保存）
+      this.Player.Data.allocatableExp -= actualUsedExp;
 
-      // 8. 推送 NOTE_UPDATE_PROP (2508) 触发经验获得弹窗（和进化动画）
+      Logger.Info(`[PetManager] 分配经验后: UserID=${this.UserID}, PetId=${pet.petId}, Level=${newLevel}, Exp=${pet.exp}, AllocExp=${this.Player.Data.allocatableExp}, UsedExp=${actualUsedExp}`);
+
+      // 9. 推送 NOTE_UPDATE_PROP (2508) 触发经验获得弹窗（和进化动画）
       await this.sendNoteUpdateProp([pet], 0);
       Logger.Info(`[PetManager] 推送 NOTE_UPDATE_PROP: PetId=${pet.petId}, OldLevel=${oldLevel}, NewLevel=${newLevel}, Evolved=${result.evolved}`);
 
-      // 9. 如果学会了新技能，推送 NOTE_UPDATE_SKILL (2507)
+      // 10. 如果学会了新技能，推送 NOTE_UPDATE_SKILL (2507)
       if (result.newSkills.length > 0) {
         await this.sendNoteUpdateSkill(pet, result.newSkills);
         Logger.Info(`[PetManager] 推送 NOTE_UPDATE_SKILL: PetId=${pet.petId}, NewSkills=[${result.newSkills.join(', ')}]`);
       }
 
-      // 10. 发送成功响应（只返回经验池剩余经验，4字节）
+      // 11. 发送成功响应（只返回经验池剩余经验，4字节）
       // 注意：根据抓包分析，响应必须在推送之后发送
       await this.Player.SendPacket(new PacketPetSetExp(this.Player.Data.allocatableExp));
       Logger.Info(`[PetManager] 发送 PET_SET_EXP 响应: RemainingAllocExp=${this.Player.Data.allocatableExp}`);

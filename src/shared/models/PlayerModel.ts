@@ -282,6 +282,7 @@ export interface IPlayerInfo {
   // ============ 货币信息 ============
   energy: number;           // 能量
   coins: number;            // 赛尔豆
+  gold?: number;            // 金豆（充值货币）
   fightBadge: number;       // 战斗徽章
 
   // ============ 精灵分配仪 ============
@@ -587,6 +588,7 @@ export function createDefaultPlayerInfo(userID: number, nick: string): IPlayerIn
     texture: 0,
     energy: 100,
     coins: 1000,
+    gold: 0,
     fightBadge: 0,
     mapID: 1,
     posX: 300,

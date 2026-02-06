@@ -198,6 +198,14 @@ export class BattleCore {
    * 应用状态效果
    */
   public static ApplyStatus(target: IBattlePet, statusType: BattleStatusType, duration: number): void {
+    // 免疫异常状态检查（由 PassiveEffectRunner 在初始化时设置 immuneFlags）
+    if (target.immuneFlags?.status) {
+      Logger.Debug(
+        `[BattleCore] ${target.name} 免疫异常状态: ${statusType}`
+      );
+      return;
+    }
+
     if (!target.statusDurations) {
       target.statusDurations = new Array(20).fill(0);
     }
@@ -206,6 +214,43 @@ export class BattleCore {
     // 同时更新主要状态显示
     target.status = statusType as unknown as BattleStatus;
     target.statusTurns = duration;
+  }
+
+  /**
+   * 应用能力等级变化
+   * 
+   * @param target 目标精灵
+   * @param statIndex 能力索引（0-5）
+   * @param change 变化值（正数提升，负数下降）
+   * @returns 是否成功应用
+   */
+  public static ApplyStatChange(target: IBattlePet, statIndex: number, change: number): boolean {
+    // 免疫能力下降检查（由 PassiveEffectRunner 在初始化时设置 immuneFlags）
+    if (change < 0 && target.immuneFlags?.statDown) {
+      const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
+      Logger.Debug(
+        `[BattleCore] ${target.name} 免疫能力下降: ${statNames[statIndex]} ${change}`
+      );
+      return false;
+    }
+
+    // 初始化 battleLv
+    if (!target.battleLv) {
+      target.battleLv = [0, 0, 0, 0, 0, 0];
+    }
+
+    // 应用能力等级变化（限制在 -6 到 +6 之间）
+    const oldLevel = target.battleLv[statIndex] || 0;
+    const newLevel = Math.max(-6, Math.min(6, oldLevel + change));
+    target.battleLv[statIndex] = newLevel;
+
+    const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
+    Logger.Debug(
+      `[BattleCore] 能力变化: ${target.name}, ${statNames[statIndex]} ` +
+      `${oldLevel} → ${newLevel} (${change >= 0 ? '+' : ''}${change})`
+    );
+
+    return true;
   }
 
   // ==================== 命中和暴击判定 ====================

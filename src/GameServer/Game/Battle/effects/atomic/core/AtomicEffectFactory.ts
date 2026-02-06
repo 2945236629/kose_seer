@@ -99,6 +99,47 @@ import { TypeSkillCounter } from '../special/TypeSkillCounter';
 import { StatBoostNullify } from '../special/StatBoostNullify';
 import { OnOpponentMiss } from '../special/OnOpponentMiss';
 import { RandomStatusEffect } from '../special/RandomStatusEffect';
+import { StatDownImmunityPassive } from '../passive/StatDownImmunityPassive';
+import { StatusImmunityPassive } from '../passive/StatusImmunityPassive';
+import { DamageReductionPassive } from '../passive/DamageReductionPassive';
+import { SameTypeAbsorbPassive } from '../passive/SameTypeAbsorbPassive';
+import { TypeImmunityPassive } from '../passive/TypeImmunityPassive';
+import { OnHitStatusInflictPassive, PhysHitStatusInflictPassive, SpHitStatusInflictPassive, OnSpHitStatusInflictPassive } from '../passive/StatusInflictPassives';
+import { AccuracyReductionPassive, SkillDodgePassive, AccuracyBonusPassive } from '../passive/AccuracyPassives';
+import { FixedCritRatePassive, CritRateBonusPassive, FixedCritDivisorPassive, StatusCritBonusPassive, CritRateReducePassive } from '../passive/CritPassives';
+import { BurstRecoverFullHpPassive, BurstRecoverFullHpPpPassive } from '../passive/BurstRecoverPassives';
+import { InfinitePPPassive } from '../passive/InfinitePPPassive';
+import { DamageReflectFractionPassive, HighDamageReflectPassive } from '../passive/DamageReflectPassives';
+import { OnSpHitStatUpPassive, OnSpHitEnemyStatDownPassive, OnHitSelfStatUpPassive } from '../passive/OnHitStatChangePassives';
+import { EscapePassive } from '../passive/EscapePassive';
+import { CounterFearPassive, CounterDamageReducePassive, CounterPriorityReducePassive } from '../passive/CounterPassives';
+import { HpStatBindPassive } from '../passive/HpStatBindPassive';
+import { SkillUnlockShieldPassive, TypeSequenceShieldPassive, RotatingTypeShieldPassive } from '../passive/ShieldPassives';
+import { SurviveWith1HpPassive, SurviveLethalChancePassive, FiveTurnImmortalPassive } from '../passive/SurvivePassives';
+import { ReceivedDamageMultiplyPassive } from '../passive/ReceivedDamageMultiplyPassive';
+import { LowHpOhkoPriorityPassive } from '../passive/LowHpOhkoPriorityPassive';
+import { ReviveOnDeathPassive, ReviveFullPassive } from '../passive/RevivePassives';
+import { FlatStatBonusPassive } from '../passive/FlatStatBonusPassive';
+import { TypeDamageBonusPassive } from '../passive/TypeDamageBonusPassive';
+import { DamageBonusPercentPassive, EvenDamageMultiplyPassive, OddDamageDividePassive, BothDamageReducePassive, BothDamageMultiplyPassive, ChanceDamageFlatReducePassive, ChanceFullBlockPassive, PhysChanceDamageBonusPassive, SpChanceDamageBonusPassive, AttackTypeDamageBonusPassive, SelfDamageReducePassive } from '../passive/DamageModifyPassives';
+import { TurnEndHealPassive, BothTurnHealPercentPassive, BothTurnDamagePassive, TurnDrainPassive, AsymmetricTurnHealPassive, TurnEnemyDamagePassive } from '../passive/TurnHealPassives';
+import { PriorityChangePassive, LowHpPriorityPassive, HighDamageNextPriorityPassive } from '../passive/PriorityPassives';
+import { AttackTypeImmunePassive } from '../passive/AttackTypeImmunePassive';
+import { PostHitDamageReductionPassive } from '../passive/PostHitDamageReductionPassive';
+import { EffectImmunityPassive, SkillEffectImmunityPassive } from '../passive/EffectImmunityPassives';
+import { RotatingAttackImmunityPassive } from '../passive/RotatingAttackImmunityPassive';
+import { TimedOhkoPassive } from '../passive/TimedOhkoPassive';
+import { BossRagePassive } from '../passive/BossRagePassive';
+import { BossPossessionPassive } from '../passive/BossPossessionPassive';
+import { SpecificTypeAbsorbPassive } from '../passive/SpecificTypeAbsorbPassive';
+import { GenderDamageBonusPassive } from '../passive/GenderDamageBonusPassive';
+import { CopyEnemyBuffPassive } from '../passive/CopyEnemyBuffPassive';
+import { LowDamageHealPassive, DamageLifestealPassive, HitStackWeaknessPassive, HighDamageNextDoublePassive, HighDamageHealPassive, LowHpGuardianPassive } from '../passive/OnHitPassives';
+import { HighDamageCounterKillPassive } from '../passive/HighDamageCounterKillPassive';
+import { DodgeHealPassive } from '../passive/DodgeHealPassive';
+import { LowHpFullHealChancePassive } from '../passive/LowHpFullHealChancePassive';
+import { TypeOhkoPassive } from '../passive/TypeOhkoPassive';
+import { ClearEnemyTurnEffectsPassive } from '../passive/ClearEnemyTurnEffectsPassive';
 import { Logger } from '../../../../../../shared/utils/Logger';
 
 /**
@@ -139,6 +180,10 @@ export class AtomicEffectFactory {
         case AtomicEffectType.CRIT_MODIFIER:
           return new CritModifier(params as any);
         case AtomicEffectType.IMMUNE:
+          // 检查是否是被动免疫效果
+          const immuneType = (params as any).immuneType;
+          if (immuneType === 'stat_down') return new StatDownImmunityPassive();
+          if (immuneType === 'status') return new StatusImmunityPassive();
           return new ImmuneEffect(params as any);
         case AtomicEffectType.FIXED_DAMAGE:
           return new FixedDamageEffect(params as any);
@@ -258,6 +303,160 @@ export class AtomicEffectFactory {
           if (specialType === 'on_opponent_miss') return new OnOpponentMiss(params as any);
           if (specialType === 'random_status') return new RandomStatusEffect(params as any);
           
+          // BOSS被动特性 - 已有
+          if (specialType === 'damage_reduction_passive') return new DamageReductionPassive(params as any);
+          if (specialType === 'same_type_absorb') return new SameTypeAbsorbPassive();
+          if (specialType === 'type_immunity') return new TypeImmunityPassive(params as any);
+
+          // BOSS被动特性 - 状态施加 (2006, 2066, 2067, 2078)
+          if (specialType === 'on_hit_status_inflict') return new OnHitStatusInflictPassive(params as any);
+          if (specialType === 'phys_hit_status_inflict') return new PhysHitStatusInflictPassive(params as any);
+          if (specialType === 'sp_hit_status_inflict') return new SpHitStatusInflictPassive(params as any);
+          if (specialType === 'on_sp_hit_status_inflict') return new OnSpHitStatusInflictPassive(params as any);
+
+          // BOSS被动特性 - 命中率 (2007, 2024, 2029)
+          if (specialType === 'accuracy_reduction_passive') return new AccuracyReductionPassive(params as any);
+          if (specialType === 'skill_dodge') return new SkillDodgePassive(params as any);
+          if (specialType === 'accuracy_bonus') return new AccuracyBonusPassive(params as any);
+
+          // BOSS被动特性 - 暴击率 (2008, 2030, 2045, 2057, 2064)
+          if (specialType === 'fixed_crit_rate') return new FixedCritRatePassive(params as any);
+          if (specialType === 'crit_rate_bonus') return new CritRateBonusPassive(params as any);
+          if (specialType === 'fixed_crit_divisor') return new FixedCritDivisorPassive(params as any);
+          if (specialType === 'status_crit_bonus') return new StatusCritBonusPassive(params as any);
+          if (specialType === 'crit_rate_reduce') return new CritRateReducePassive(params as any);
+
+          // BOSS被动特性 - 濒死回满 (2009, 2051)
+          if (specialType === 'burst_recover_full_hp') return new BurstRecoverFullHpPassive(params as any);
+          if (specialType === 'burst_recover_full_hp_pp') return new BurstRecoverFullHpPpPassive(params as any);
+
+          // BOSS被动特性 - 无限PP (2010)
+          if (specialType === 'infinite_pp') return new InfinitePPPassive(params as any);
+
+          // BOSS被动特性 - 伤害反弹 (2011, 2083)
+          if (specialType === 'damage_reflect_fraction') return new DamageReflectFractionPassive(params as any);
+          if (specialType === 'high_damage_reflect') return new HighDamageReflectPassive(params as any);
+
+          // BOSS被动特性 - 受击能力变化 (2012, 2034, 2035)
+          if (specialType === 'on_sp_hit_stat_up') return new OnSpHitStatUpPassive(params as any);
+          if (specialType === 'on_sp_hit_enemy_stat_down') return new OnSpHitEnemyStatDownPassive(params as any);
+          if (specialType === 'on_hit_self_stat_up') return new OnHitSelfStatUpPassive(params as any);
+
+          // BOSS被动特性 - 定时逃跑 (2013)
+          if (specialType === 'timed_escape') return new EscapePassive(params as any);
+
+          // BOSS被动特性 - 天敌 (2014, 2015, 2043)
+          if (specialType === 'counter_fear') return new CounterFearPassive(params as any);
+          if (specialType === 'counter_damage_reduce') return new CounterDamageReducePassive(params as any);
+          if (specialType === 'counter_priority_reduce') return new CounterPriorityReducePassive(params as any);
+
+          // BOSS被动特性 - 血量绑定能力 (2016)
+          if (specialType === 'hp_stat_bind') return new HpStatBindPassive(params as any);
+
+          // BOSS被动特性 - 护盾 (2020, 2027, 2036)
+          if (specialType === 'skill_unlock_shield') return new SkillUnlockShieldPassive(params as any);
+          if (specialType === 'type_sequence_shield') return new TypeSequenceShieldPassive(params as any);
+          if (specialType === 'rotating_type_shield') return new RotatingTypeShieldPassive(params as any);
+
+          // BOSS被动特性 - 存活 (2021, 2031, 2046)
+          if (specialType === 'survive_with_1hp_unless_skill') return new SurviveWith1HpPassive(params as any);
+          if (specialType === 'survive_lethal_chance') return new SurviveLethalChancePassive(params as any);
+          if (specialType === 'five_turn_immortal') return new FiveTurnImmortalPassive(params as any);
+
+          // BOSS被动特性 - 受击伤害倍增 (2022)
+          if (specialType === 'received_damage_multiply') return new ReceivedDamageMultiplyPassive(params as any);
+
+          // BOSS被动特性 - 低血秒杀先手 (2023)
+          if (specialType === 'low_hp_ohko_priority') return new LowHpOhkoPriorityPassive(params as any);
+
+          // BOSS被动特性 - 复活 (2025, 2044)
+          if (specialType === 'revive_on_death') return new ReviveOnDeathPassive(params as any);
+          if (specialType === 'revive_full') return new ReviveFullPassive(params as any);
+
+          // BOSS被动特性 - 固定属性加成 (2026)
+          if (specialType === 'flat_stat_bonus') return new FlatStatBonusPassive(params as any);
+
+          // BOSS被动特性 - 属性伤害加成 (2028)
+          if (specialType === 'type_damage_bonus') return new TypeDamageBonusPassive(params as any);
+
+          // BOSS被动特性 - 伤害修改 (2038, 2039, 2040, 2047, 2055, 2060, 2061, 2062, 2063, 2065, 2076)
+          if (specialType === 'damage_bonus_percent') return new DamageBonusPercentPassive(params as any);
+          if (specialType === 'even_damage_multiply') return new EvenDamageMultiplyPassive(params as any);
+          if (specialType === 'odd_damage_divide') return new OddDamageDividePassive(params as any);
+          if (specialType === 'both_damage_reduce') return new BothDamageReducePassive(params as any);
+          if (specialType === 'both_damage_multiply') return new BothDamageMultiplyPassive(params as any);
+          if (specialType === 'chance_damage_flat_reduce') return new ChanceDamageFlatReducePassive(params as any);
+          if (specialType === 'chance_full_block') return new ChanceFullBlockPassive(params as any);
+          if (specialType === 'phys_chance_damage_bonus') return new PhysChanceDamageBonusPassive(params as any);
+          if (specialType === 'sp_chance_damage_bonus') return new SpChanceDamageBonusPassive(params as any);
+          if (specialType === 'attack_type_damage_bonus') return new AttackTypeDamageBonusPassive(params as any);
+          if (specialType === 'self_damage_reduce') return new SelfDamageReducePassive(params as any);
+
+          // BOSS被动特性 - 回合回血/扣血 (2041, 2053, 2054, 2071, 2075, 2077)
+          if (specialType === 'turn_end_heal') return new TurnEndHealPassive(params as any);
+          if (specialType === 'both_turn_heal_percent') return new BothTurnHealPercentPassive(params as any);
+          if (specialType === 'both_turn_damage') return new BothTurnDamagePassive(params as any);
+          if (specialType === 'turn_drain') return new TurnDrainPassive(params as any);
+          if (specialType === 'asymmetric_turn_heal') return new AsymmetricTurnHealPassive(params as any);
+          if (specialType === 'turn_enemy_damage') return new TurnEnemyDamagePassive(params as any);
+
+          // BOSS被动特性 - 先制 (2042, 2097, 2098)
+          if (specialType === 'priority_change') return new PriorityChangePassive(params as any);
+          if (specialType === 'low_hp_priority') return new LowHpPriorityPassive(params as any);
+          if (specialType === 'high_damage_next_priority') return new HighDamageNextPriorityPassive(params as any);
+
+          // BOSS被动特性 - 攻击类型无效 (2048)
+          if (specialType === 'attack_type_immune') return new AttackTypeImmunePassive(params as any);
+
+          // BOSS被动特性 - 受击后减伤 (2049)
+          if (specialType === 'post_hit_damage_reduction') return new PostHitDamageReductionPassive(params as any);
+
+          // BOSS被动特性 - 免疫特效 (2050, 2185)
+          if (specialType === 'effect_immunity') return new EffectImmunityPassive(params as any);
+          if (specialType === 'skill_effect_immunity') return new SkillEffectImmunityPassive(params as any);
+
+          // BOSS被动特性 - 轮换免疫 (2052)
+          if (specialType === 'rotating_attack_immunity') return new RotatingAttackImmunityPassive(params as any);
+
+          // BOSS被动特性 - 定时秒杀 (2056)
+          if (specialType === 'timed_ohko') return new TimedOhkoPassive(params as any);
+
+          // BOSS被动特性 - 魔王愤怒/附身 (2058, 2059)
+          if (specialType === 'boss_rage') return new BossRagePassive(params as any);
+          if (specialType === 'boss_possession') return new BossPossessionPassive(params as any);
+
+          // BOSS被动特性 - 特定系吸收 (2068)
+          if (specialType === 'specific_type_absorb') return new SpecificTypeAbsorbPassive(params as any);
+
+          // BOSS被动特性 - 性别伤害加成 (2069)
+          if (specialType === 'gender_damage_bonus') return new GenderDamageBonusPassive(params as any);
+
+          // BOSS被动特性 - 复制强化 (2070)
+          if (specialType === 'copy_enemy_buff') return new CopyEnemyBuffPassive(params as any);
+
+          // BOSS被动特性 - 命中后效果 (2072, 2073, 2074, 2079, 2080, 2081)
+          if (specialType === 'low_damage_heal') return new LowDamageHealPassive(params as any);
+          if (specialType === 'damage_lifesteal') return new DamageLifestealPassive(params as any);
+          if (specialType === 'hit_stack_weakness') return new HitStackWeaknessPassive(params as any);
+          if (specialType === 'high_damage_next_double') return new HighDamageNextDoublePassive(params as any);
+          if (specialType === 'high_damage_heal') return new HighDamageHealPassive(params as any);
+          if (specialType === 'low_hp_guardian') return new LowHpGuardianPassive(params as any);
+
+          // BOSS被动特性 - 高伤反杀 (2037)
+          if (specialType === 'high_damage_counter_kill') return new HighDamageCounterKillPassive(params as any);
+
+          // BOSS被动特性 - 闪避回血 (2082)
+          if (specialType === 'dodge_heal') return new DodgeHealPassive(params as any);
+
+          // BOSS被动特性 - 低血概率回满 (2033)
+          if (specialType === 'low_hp_full_heal_chance') return new LowHpFullHealChancePassive(params as any);
+
+          // BOSS被动特性 - 属性秒杀 (2205)
+          if (specialType === 'type_ohko') return new TypeOhkoPassive(params as any);
+
+          // BOSS被动特性 - 命中消回合效果 (2772)
+          if (specialType === 'clear_enemy_turn_effects') return new ClearEnemyTurnEffectsPassive(params as any);
+
           return new SpecialEffect(params as any);
         case AtomicEffectType.DURATION:
           const wrapper = new DurationWrapper(params as any);

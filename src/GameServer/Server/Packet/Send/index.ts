@@ -7,3 +7,4 @@ export * from './Item';
 export * from './Map';
 export * from './Friend';
 export * from './Vip';
+export * from './User';

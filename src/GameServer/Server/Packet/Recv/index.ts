@@ -36,3 +36,5 @@ export * from './Friend';
 // 兑换相关Handler
 export * from './Exchange';
 
+// 用户相关Handler
+export * from './User';

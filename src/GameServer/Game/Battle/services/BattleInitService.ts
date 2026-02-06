@@ -107,6 +107,33 @@ export class BattleInitService {
         startTime: Math.floor(Date.now() / 1000)
       };
 
+      // 7. 触发被动能力（BATTLE_START时机）
+      const { PassiveAbilitySystem } = await import('../PassiveAbilitySystem');
+      
+      // 触发玩家精灵的被动能力
+      const playerPassiveResults = PassiveAbilitySystem.TriggerPassiveAbilities(
+        playerBattlePet,
+        enemyBattlePet
+      );
+      if (playerPassiveResults.length > 0) {
+        Logger.Info(
+          `[BattleInitService] 玩家精灵被动能力触发: ${playerBattlePet.name}, ` +
+          `结果数: ${playerPassiveResults.length}`
+        );
+      }
+      
+      // 触发敌人精灵的被动能力
+      const enemyPassiveResults = PassiveAbilitySystem.TriggerPassiveAbilities(
+        enemyBattlePet,
+        playerBattlePet
+      );
+      if (enemyPassiveResults.length > 0) {
+        Logger.Info(
+          `[BattleInitService] 敌人精灵被动能力触发: ${enemyBattlePet.name}, ` +
+          `结果数: ${enemyPassiveResults.length}`
+        );
+      }
+
       Logger.Info(`[BattleInitService] 创建战斗: UserID=${userId}, Pet=${playerPet.petId}(Lv${playerPet.level}) vs Enemy=${enemyId}(Lv${enemyLevel})`);
       return battle;
 

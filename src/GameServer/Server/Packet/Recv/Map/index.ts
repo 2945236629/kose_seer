@@ -4,7 +4,6 @@ export * from './LeaveMapHandler';
 export * from './ListMapPlayerHandler';
 export * from './MapOgreListHandler';
 export * from './GetSimUserInfoHandler';
-export * from './GetMoreUserInfoHandler';
 export * from './ChangeNickNameHandler';
 export * from './ChangeColorHandler';
 export * from './PeopleWalkHandler';

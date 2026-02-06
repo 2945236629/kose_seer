@@ -504,4 +504,34 @@ export class GameConfig {
     const { SkillEffectsConfig } = require('./SkillEffectsConfig');
     await SkillEffectsConfig.Instance.Reload();
   }
+
+  /**
+   * 获取商品配置
+   */
+  public static GetShopConfig(): any | null {
+    return ConfigRegistry.Instance.Get<any>(ConfigKeys.SHOP_CONFIG);
+  }
+
+  /**
+   * 获取指定商品的配置
+   * @param productId 商品ID
+   */
+  public static GetProductById(productId: number): any | null {
+    const config = this.GetShopConfig();
+    if (!config || !config.products) {
+      return null;
+    }
+    return config.products.find((p: any) => p.productID === productId) || null;
+  }
+
+  /**
+   * 获取所有商品配置
+   */
+  public static GetAllProducts(): any[] {
+    const config = this.GetShopConfig();
+    if (!config || !config.products) {
+      return [];
+    }
+    return config.products;
+  }
 }

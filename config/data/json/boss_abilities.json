@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "description": "BOSS特性配置 - 定义哪些精灵拥有哪些被动特性",
+  "lastUpdate": "2026-02-06",
+  "bossAbilities": [
+    {
+      "petId": 2001,
+      "petName": "示例BOSS 1",
+      "abilities": [1902, 1904],
+      "description": "免疫能力下降 + 受伤减免50%"
+    },
+    {
+      "petId": 2002,
+      "petName": "示例BOSS 2",
+      "abilities": [1903],
+      "description": "免疫异常状态"
+    },
+    {
+      "petId": 2003,
+      "petName": "示例BOSS 3",
+      "abilities": [1905],
+      "description": "同系吸收"
+    },
+    {
+      "petId": 2004,
+      "petName": "示例BOSS 4",
+      "abilities": [1906],
+      "description": "属性免疫（只受普通属性伤害）"
+    },
+    {
+      "petId": 2005,
+      "petName": "示例BOSS 5 - 全能力",
+      "abilities": [1902, 1903, 1904, 1905, 1906],
+      "description": "拥有所有5个被动特性的超级BOSS"
+    }
+  ],
+  "notes": [
+    "petId: 精灵ID，对应pets.xml中的ID",
+    "abilities: 特性ID数组，对应skill_effects_v2.json中的effectId",
+    "当前已实现的特性:",
+    "  1902 - 免疫能力下降",
+    "  1903 - 免疫异常状态",
+    "  1904 - 受伤减免 (参数: 减免百分比，默认50%)",
+    "  1905 - 同系吸收",
+    "  1906 - 属性免疫 (参数: 允许的属性类型列表，默认只允许普通属性8)"
+  ]
+}

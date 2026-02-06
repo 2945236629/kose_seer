@@ -6,7 +6,6 @@ import { SeerMapUserInfoProto } from '../../../shared/proto/common/SeerMapUserIn
 import { EnterMapReqProto } from '../../../shared/proto/packets/req/map/EnterMapReqProto';
 import { ChatReqProto } from '../../../shared/proto/packets/req/map/ChatReqProto';
 import { GetSimUserInfoRspProto } from '../../../shared/proto/packets/rsp/map/GetSimUserInfoRspProto';
-import { GetMoreUserInfoRspProto } from '../../../shared/proto/packets/rsp/map/GetMoreUserInfoRspProto';
 import { ChatRspProto } from '../../../shared/proto/packets/rsp/map/ChatRspProto';
 import { ListMapPlayerRspProto } from '../../../shared/proto/packets/rsp/map/ListMapPlayerRspProto';
 import { PlayerRepository } from '../../../DataBase/repositories/Player/PlayerRepository';
@@ -178,36 +177,6 @@ export class MapManager extends BaseManager {
         .setTeamId(playerData.teamInfo.id)
         .setTeamIsShow(playerData.teamInfo.isShow ? 1 : 0)
         .setClothes(playerData.clothes.map((c: any) => ({ id: c.id, level: c.level || 0 })))
-    );
-  }
-
-  /**
-   * 处理获取详细用户信息
-   */
-  public async HandleGetMoreUserInfo(targetId: number): Promise<void> {
-    const queryId = targetId || this.UserID;
-    const playerData = queryId === this.UserID 
-      ? this.Player.Data
-      : await this._playerRepo.FindByUserId(queryId);
-    if (!playerData) {
-      Logger.Warn(`[MapManager] 玩家数据不存在 ${queryId}`);
-      return;
-    }
-
-    await this.Player.SendPacket(
-      new GetMoreUserInfoRspProto()
-        .setUserId(queryId)
-        .setNick(playerData.nick)
-        .setRegTime(playerData.regTime)
-        .setPetAllNum(0)
-        .setPetMaxLev(100)
-        .setBossAchievement('')
-        .setGraduationCount(playerData.graduationCount)
-        .setMonKingWin(0)
-        .setMessWin(0)
-        .setMaxStage(0)
-        .setMaxArenaWins(0)
-        .setCurTitle(playerData.curTitle)
     );
   }
 

@@ -227,7 +227,7 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
   /**
    * 更新货币
    */
-  public async UpdateCurrency(userId: number, energy?: number, coins?: number): Promise<boolean> {
+  public async UpdateCurrency(userId: number, energy?: number, coins?: number, gold?: number): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -238,6 +238,10 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
     if (coins !== undefined) {
       updates.push('coins = ?');
       values.push(coins);
+    }
+    if (gold !== undefined) {
+      updates.push('gold = ?');
+      values.push(gold);
     }
 
     if (updates.length === 0) return false;
@@ -255,7 +259,7 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
   /**
    * 增加货币
    */
-  public async AddCurrency(userId: number, energy?: number, coins?: number): Promise<boolean> {
+  public async AddCurrency(userId: number, energy?: number, coins?: number, gold?: number): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -266,6 +270,10 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
     if (coins !== undefined && coins !== 0) {
       updates.push('coins = coins + ?');
       values.push(coins);
+    }
+    if (gold !== undefined && gold !== 0) {
+      updates.push('gold = gold + ?');
+      values.push(gold);
     }
 
     if (updates.length === 0) return false;
@@ -599,6 +607,7 @@ export class PlayerRepository extends BaseRepository<IPlayerRow> {
     player.texture = row.texture;
     player.energy = row.energy;
     player.coins = row.coins;
+    player.gold = (row as any).gold || 0;
     player.fightBadge = row.fight_badge;
     player.allocatableExp = (row as any).allocatable_exp || 0;
     player.mapID = row.map_id;

@@ -72,7 +72,7 @@ export class PlayerDataAccessor {
     try {
       // 使用 PlayerRepository 更新数据库
       // 注意：这里需要更新所有可能被修改的字段
-      await this._playerRepo.UpdateCurrency(data.userID, data.energy, data.coins);
+      await this._playerRepo.UpdateCurrency(data.userID, data.energy, data.coins, data.gold);
       await this._playerRepo.UpdatePosition(data.userID, data.mapID, data.posX, data.posY);
       
       // 更新可分配经验

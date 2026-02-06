@@ -53,7 +53,7 @@ export interface IBattlePet {
   
   // 效果系统支持
   battleLevels?: number[]; // 能力等级修正 (-6 到 +6) [ATK, DEF, SP_ATK, SP_DEF, SPEED, ACCURACY]
-  effectCounters?: { [key: string]: number }; // 效果计数器
+  effectCounters?: { [key: string]: any }; // 效果计数器（数值型为回合计数，特殊键存储被动特性等复杂数据）
   
   // 状态效果字段
   status?: BattleStatus;   // 当前主要异常状态（单个，用于显示）
