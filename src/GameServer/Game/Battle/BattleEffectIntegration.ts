@@ -5,18 +5,23 @@
  * 1. 技能效果 — 由 EffectTrigger 从 skill.sideEffect 驱动
  * 2. 被动特性 — 由 PassiveEffectRunner 从 pet.effectCounters 驱动
  *
- * 触发时机（共24个）：
+ * 触发时机（共29个）：
  * - BATTLE_START / BATTLE_END
  * - TURN_START / TURN_END
+ * - ATTACK_START                          — 出手流程开始（异常扣血在此）
  * - BEFORE_SKILL / AFTER_SKILL
  * - BEFORE_SPEED_CHECK
  * - BEFORE_HIT_CHECK / HIT_CHECK / AFTER_HIT_CHECK
+ * - ON_HIT                                — 命中时（需命中才触发，技能效果结算前）
+ * - SKILL_EFFECT                           — 即时技能效果结算（命中后，伤害计算前）
  * - BEFORE_CRIT_CHECK / CRIT_CHECK
  * - BEFORE_DAMAGE_CALC / AFTER_DAMAGE_CALC
  * - BEFORE_DAMAGE_APPLY / AFTER_DAMAGE_APPLY
  * - ON_HP_CHANGE / ON_ATTACKED / ON_ATTACK
  * - ON_KO / AFTER_KO
  * - ON_RECEIVE_DAMAGE / ON_EVADE
+ * - ATTACK_END                             — 出手流程结束时（单次攻击结束）
+ * - AFTER_ATTACK_END                       — 出手流程结束后（双方攻击都完成后）
  */
 
 import { Logger } from '../../../shared/utils';
@@ -26,6 +31,23 @@ import { EffectTiming, IEffectResult } from './effects/core/EffectContext';
 import { EffectTrigger } from './EffectTrigger';
 import { EffectConflictResolver } from './effects/core/EffectPriority';
 import { PassiveEffectRunner, IPassiveTriggerContext } from './PassiveEffectRunner';
+import { BattleCore } from './BattleCore';
+
+// ==================== 速度判定修正结果 ====================
+
+/**
+ * 速度判定前效果的结构化返回
+ * 包含双方的先制修正信息
+ */
+export interface ISpeedCheckModifiers {
+  results: IEffectResult[];
+  /** 玩家侧（attacker / pet1） */
+  playerAlwaysFirst: boolean;
+  playerPriorityMod: number;
+  /** 敌方侧（defender / pet2） */
+  enemyAlwaysFirst: boolean;
+  enemyPriorityMod: number;
+}
 
 // ==================== 辅助函数 ====================
 
@@ -137,7 +159,7 @@ export class BattleEffectIntegration {
    */
   public static OnTurnStart(battle: IBattleInfo): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 回合开始: Turn=${battle.turn + 1}`);
+    // 只在有效果时才输出日志
 
     // 技能持续效果
     const playerResults = this.ProcessTurnStartEffects(battle.player, battle.enemy);
@@ -165,7 +187,7 @@ export class BattleEffectIntegration {
    */
   public static OnTurnEnd(battle: IBattleInfo): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 回合结束: Turn=${battle.turn}`);
+    // 只在有效果时才输出日志
 
     // 技能持续效果
     const playerResults = this.ProcessTurnEndEffects(battle.player, battle.enemy);
@@ -186,15 +208,15 @@ export class BattleEffectIntegration {
 
   /**
    * 速度判定前触发效果
+   * 返回结构化的速度修正信息，包含双方的 alwaysFirst 和 priorityModifier
    */
   public static OnBeforeSpeedCheck(
     attacker: IBattlePet,
     defender: IBattlePet,
     attackerSkill: ISkillConfig,
     defenderSkill: ISkillConfig
-  ): IEffectResult[] {
+  ): ISpeedCheckModifiers {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 速度判定前`);
 
     // 攻击方技能效果
     const attackerResults = EffectTrigger.TriggerSkillEffect(
@@ -210,14 +232,68 @@ export class BattleEffectIntegration {
     EffectTrigger.ApplyEffectResults(defenderResults, defender, attacker);
     results.push(...defenderResults);
 
-    // 被动特性（如必先出手、先制变化等）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.BEFORE_SPEED_CHECK, attackerSkill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
+    // 被动特性 — 分别为双方创建独立 context，以区分谁设置了 alwaysFirst/priorityModifier
+    const attackerCtx: IPassiveTriggerContext = { attacker, defender, skill: attackerSkill };
+    const defenderCtx: IPassiveTriggerContext = { attacker: defender, defender: attacker, skill: defenderSkill };
 
-    return results;
+    // 攻击方被动：owner=attacker, opponent=defender
+    const attackerPassiveResults = PassiveEffectRunner.TriggerAtTiming(
+      attacker, defender, EffectTiming.BEFORE_SPEED_CHECK, attackerCtx
+    );
+    EffectTrigger.ApplyEffectResults(attackerPassiveResults, attacker, defender);
+    results.push(...attackerPassiveResults);
+
+    // 防守方被动：owner=defender, opponent=attacker
+    const defenderPassiveResults = PassiveEffectRunner.TriggerAtTiming(
+      defender, attacker, EffectTiming.BEFORE_SPEED_CHECK, defenderCtx
+    );
+    EffectTrigger.ApplyEffectResults(defenderPassiveResults, defender, attacker);
+    results.push(...defenderPassiveResults);
+
+    // 从被动结果中提取修正值
+    // 检查 attacker 侧是否有 alwaysFirst / priorityModifier
+    let playerAlwaysFirst = false;
+    let playerPriorityMod = 0;
+    let enemyAlwaysFirst = false;
+    let enemyPriorityMod = 0;
+
+    // 攻击方被动结果
+    for (const r of attackerPassiveResults) {
+      if (r.success) {
+        if (r.type === 'low_hp_priority' || r.type === 'next_turn_priority') {
+          playerAlwaysFirst = true;
+        }
+        if (r.type === 'low_hp_ohko' && r.value !== undefined) {
+          playerPriorityMod += r.value;
+        }
+        if (r.type === 'priority_change' && r.value !== undefined) {
+          playerPriorityMod += r.value;
+        }
+      }
+    }
+
+    // 防守方被动结果
+    for (const r of defenderPassiveResults) {
+      if (r.success) {
+        if (r.type === 'low_hp_priority' || r.type === 'next_turn_priority') {
+          enemyAlwaysFirst = true;
+        }
+        if (r.type === 'low_hp_ohko' && r.value !== undefined) {
+          enemyPriorityMod += r.value;
+        }
+        if (r.type === 'priority_change' && r.value !== undefined) {
+          enemyPriorityMod += r.value;
+        }
+      }
+    }
+
+    return {
+      results,
+      playerAlwaysFirst,
+      playerPriorityMod,
+      enemyAlwaysFirst,
+      enemyPriorityMod,
+    };
   }
 
   // ==================== 技能使用时机 ====================
@@ -231,7 +307,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 技能使用前: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.BEFORE_SKILL
@@ -259,7 +334,6 @@ export class BattleEffectIntegration {
     damage: number
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 技能使用后: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, damage, EffectTiming.AFTER_SKILL
@@ -288,7 +362,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 命中判定前: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.BEFORE_HIT_CHECK
@@ -315,7 +388,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 命中判定: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.HIT_CHECK
@@ -343,7 +415,6 @@ export class BattleEffectIntegration {
     hit: boolean
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 命中判定后: Hit=${hit}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.AFTER_HIT_CHECK
@@ -372,7 +443,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 暴击判定前: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.BEFORE_CRIT_CHECK
@@ -399,7 +469,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 暴击判定: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.CRIT_CHECK
@@ -428,7 +497,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 伤害计算前: Skill=${skill.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.BEFORE_DAMAGE_CALC
@@ -577,7 +645,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 受到攻击: Defender=${defender.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.ON_ATTACKED
@@ -604,7 +671,6 @@ export class BattleEffectIntegration {
     skill: ISkillConfig
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 攻击时: Attacker=${attacker.name}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, 0, EffectTiming.ON_ATTACK
@@ -632,7 +698,6 @@ export class BattleEffectIntegration {
     damage: number
   ): IEffectResult[] {
     const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 受到伤害: Damage=${damage}`);
 
     const skillResults = EffectTrigger.TriggerSkillEffect(
       skill, attacker, defender, damage, EffectTiming.ON_RECEIVE_DAMAGE
@@ -762,6 +827,164 @@ export class BattleEffectIntegration {
     );
     EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
     results.push(...passiveResults);
+
+    return results;
+  }
+
+  // ==================== 出手流程时机（9阶段） ====================
+
+  /**
+   * 阶段1: 出手流程开始
+   * - 处理 defender 身上的异常扣血（先手方挂在对手身上的异常先生效）
+   * - 触发 ATTACK_START 时机的被动/技能效果
+   *
+   * @returns 包含状态伤害值的效果结果
+   */
+  public static OnAttackStart(
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    skill: ISkillConfig
+  ): { statusDamage: number; results: IEffectResult[] } {
+    const results: IEffectResult[] = [];
+    Logger.Debug(`[BattleEffectIntegration] 出手流程开始: ${attacker.name} → ${defender.name}`);
+
+    // 处理 defender 身上的异常扣血
+    const statusDamage = BattleCore.ProcessStatusEffects(defender);
+    if (statusDamage > 0) {
+      defender.hp = Math.max(0, defender.hp - statusDamage);
+      Logger.Info(`[BattleEffectIntegration] 异常扣血: ${defender.name} 受到 ${statusDamage} 点状态伤害, HP: ${defender.hp + statusDamage} → ${defender.hp}`);
+    }
+
+    // 技能效果
+    const skillResults = EffectTrigger.TriggerSkillEffect(
+      skill, attacker, defender, 0, EffectTiming.ATTACK_START
+    );
+    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
+    results.push(...skillResults);
+
+    // 被动特性
+    const passiveResults = triggerBothPassives(
+      attacker, defender, EffectTiming.ATTACK_START, skill
+    );
+    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
+    results.push(...passiveResults);
+
+    return { statusDamage, results };
+  }
+
+  /**
+   * 阶段3: 命中时
+   * - 需命中才触发的效果
+   * - 在命中判定通过后、技能效果结算前触发
+   */
+  public static OnHit(
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    skill: ISkillConfig
+  ): IEffectResult[] {
+    const results: IEffectResult[] = [];
+    Logger.Debug(`[BattleEffectIntegration] 命中时: ${attacker.name} → ${defender.name}`);
+
+    // 技能效果
+    const skillResults = EffectTrigger.TriggerSkillEffect(
+      skill, attacker, defender, 0, EffectTiming.ON_HIT
+    );
+    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
+    results.push(...skillResults);
+
+    // 被动特性
+    const passiveResults = triggerBothPassives(
+      attacker, defender, EffectTiming.ON_HIT, skill
+    );
+    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
+    results.push(...passiveResults);
+
+    return results;
+  }
+
+  /**
+   * 阶段4: 即时技能效果结算
+   * - 大部分技能副作用在此生效（能力变化、状态施加等）
+   * - 在命中后、伤害计算前触发
+   */
+  public static OnSkillEffect(
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    skill: ISkillConfig
+  ): IEffectResult[] {
+    const results: IEffectResult[] = [];
+    Logger.Debug(`[BattleEffectIntegration] 即时技能效果结算: ${attacker.name} → ${defender.name}`);
+
+    // 技能效果
+    const skillResults = EffectTrigger.TriggerSkillEffect(
+      skill, attacker, defender, 0, EffectTiming.SKILL_EFFECT
+    );
+    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
+    results.push(...skillResults);
+
+    // 被动特性
+    const passiveResults = triggerBothPassives(
+      attacker, defender, EffectTiming.SKILL_EFFECT, skill
+    );
+    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
+    results.push(...passiveResults);
+
+    return results;
+  }
+
+  /**
+   * 阶段8: 出手流程结束时
+   * - 单次攻击所有伤害结算完毕后触发
+   * - 在击败判定前触发
+   */
+  public static OnAttackEnd(
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    skill: ISkillConfig,
+    damage: number
+  ): IEffectResult[] {
+    const results: IEffectResult[] = [];
+    Logger.Debug(`[BattleEffectIntegration] 出手流程结束时: ${attacker.name} → ${defender.name}, Damage=${damage}`);
+
+    // 技能效果
+    const skillResults = EffectTrigger.TriggerSkillEffect(
+      skill, attacker, defender, damage, EffectTiming.ATTACK_END
+    );
+    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
+    results.push(...skillResults);
+
+    // 被动特性
+    const passiveResults = triggerBothPassives(
+      attacker, defender, EffectTiming.ATTACK_END, skill, damage
+    );
+    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
+    results.push(...passiveResults);
+
+    return results;
+  }
+
+  /**
+   * 阶段9: 出手流程结束后
+   * - 双方攻击都完成后触发
+   * - 击杀控、星皇之赐等效果在此触发
+   */
+  public static OnAfterAttackEnd(battle: IBattleInfo): IEffectResult[] {
+    const results: IEffectResult[] = [];
+    Logger.Debug(`[BattleEffectIntegration] 出手流程结束后（双方攻击完成）`);
+
+    // 玩家侧被动特性
+    const playerPassive = triggerOwnPassives(
+      battle.player, battle.enemy, EffectTiming.AFTER_ATTACK_END, battle.turn
+    );
+    EffectTrigger.ApplyEffectResults(playerPassive, battle.player, battle.enemy);
+    results.push(...playerPassive);
+
+    // 敌方侧被动特性
+    const enemyPassive = triggerOwnPassives(
+      battle.enemy, battle.player, EffectTiming.AFTER_ATTACK_END, battle.turn
+    );
+    EffectTrigger.ApplyEffectResults(enemyPassive, battle.enemy, battle.player);
+    results.push(...enemyPassive);
 
     return results;
   }

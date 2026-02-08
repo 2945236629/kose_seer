@@ -375,22 +375,41 @@ export class BattleCore {
 
   /**
    * 比较速度决定先后攻
+   *
+   * @param modifiers 来自被动特性的先制修正（alwaysFirst、priorityMod）
+   * @returns true 表示 pet1 先手
    */
   public static CompareSpeed(
     pet1: IBattlePet,
     pet2: IBattlePet,
     skill1: ISkillConfig,
-    skill2: ISkillConfig
+    skill2: ISkillConfig,
+    modifiers?: {
+      pet1AlwaysFirst?: boolean;
+      pet2AlwaysFirst?: boolean;
+      pet1PriorityMod?: number;
+      pet2PriorityMod?: number;
+    }
   ): boolean {
-    // 先检查技能优先级
-    const priority1 = skill1.priority || 0;
-    const priority2 = skill2.priority || 0;
+    const p1AlwaysFirst = modifiers?.pet1AlwaysFirst ?? false;
+    const p2AlwaysFirst = modifiers?.pet2AlwaysFirst ?? false;
+
+    // 1. alwaysFirst 检查 — 一方 alwaysFirst 而另一方不是 → 该方先手
+    if (p1AlwaysFirst && !p2AlwaysFirst) return true;
+    if (p2AlwaysFirst && !p1AlwaysFirst) return false;
+    // 双方都 alwaysFirst 或都不是 → 继续下一步
+
+    // 2. 先制等级比较 — (skill.priority + priorityMod) clamp 到 -128~+127
+    const p1PriorityMod = modifiers?.pet1PriorityMod ?? 0;
+    const p2PriorityMod = modifiers?.pet2PriorityMod ?? 0;
+    const priority1 = Math.max(-128, Math.min(127, (skill1.priority || 0) + p1PriorityMod));
+    const priority2 = Math.max(-128, Math.min(127, (skill2.priority || 0) + p2PriorityMod));
 
     if (priority1 !== priority2) {
       return priority1 > priority2;
     }
 
-    // 计算实际速度 (考虑能力等级)
+    // 3. 速度比较 — 含能力等级和麻痹修正
     let speed1 = pet1.speed;
     let speed2 = pet2.speed;
 
@@ -412,8 +431,8 @@ export class BattleCore {
       return speed1 > speed2;
     }
 
-    // 速度相同时随机
-    return Math.random() < 0.5;
+    // 4. 平局 — 速度相同时挑战方（pet1）先手
+    return true;
   }
 
   // ==================== AI系统 ====================
@@ -472,10 +491,20 @@ export class BattleCore {
       skill.power || 40,
       skill.type || 8,
       (skill.category as SkillCategory) || SkillCategory.PHYSICAL,
-      attacker.battleLv,
-      defender.battleLv,
+      attacker.battleLevels || attacker.battleLv,  // 优先使用battleLevels
+      defender.battleLevels || defender.battleLv,  // 优先使用battleLevels
       { isCrit }
     );
+  }
+
+  /**
+   * 调试：打印精灵的battleLv状态
+   */
+  public static DebugBattleLv(pet: IBattlePet, label: string): void {
+    const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
+    const levels = pet.battleLv || [];
+    const levelsStr = levels.map((lv, i) => `${statNames[i]}:${lv || 0}`).join(', ');
+    Logger.Debug(`[BattleCore] ${label} battleLv: [${levelsStr}]`);
   }
 
   // ==================== 日志 ====================

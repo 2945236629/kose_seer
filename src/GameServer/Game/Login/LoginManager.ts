@@ -272,32 +272,39 @@ export class LoginManager {
       Logger.Debug(`[LoginManager] 任务数据: 共${playerInstance.TaskManager.TaskData.TaskList.size}个任务`);
       
       // 加载精灵数据并填充到 Proto（所有精灵，包括背包和仓库）
+      // 注意：首发精灵已经在 HandlePetDefault 时被移到第一位，这里不需要排序
       const allPets = playerInstance.PetManager.PetData.PetList;
+      
       Logger.Debug(`[LoginManager] PetData.PetList 总数: ${allPets.length}`);
       
       if (allPets.length > 0) {
-        Logger.Debug(`[LoginManager] 所有精灵列表: ${JSON.stringify(allPets.map(p => ({
+        Logger.Debug(`[LoginManager] 精灵列表: ${JSON.stringify(allPets.map(p => ({
           petId: p.petId,
           level: p.level,
           isInBag: p.isInBag,
+          isDefault: p.isDefault,
           catchTime: p.catchTime
         })))}`);
       }
       
-      proto.petList = playerInstance.PetManager.GetPetProtoList(playerInstance.PetManager.PetData.PetList);
+      proto.petList = playerInstance.PetManager.GetPetProtoList(allPets);
       
       Logger.Info(`[LoginManager] 精灵数据: 共${allPets.length}个精灵（包括背包和仓库）`);
       if (allPets.length > 0) {
-        Logger.Info(`[LoginManager] 精灵列表: ${allPets.map(p => `${p.petId}(Lv${p.level},${p.isInBag ? '背包' : '仓库'},CT:0x${p.catchTime.toString(16)})`).join(', ')}`);
+        Logger.Info(`[LoginManager] 精灵列表: ${allPets.map(p => `${p.petId}(Lv${p.level},${p.isInBag ? '背包' : '仓库'},${p.isDefault ? '首发' : ''},CT:0x${p.catchTime.toString(16)})`).join(', ')}`);
       } else {
         Logger.Warn(`[LoginManager] 玩家没有精灵！UserID=${userID}`);
       }
 
       // 发送响应
       await playerInstance.SendPacket(proto);
+      
+      Logger.Info(`[LoginManager] 登录包已发送，等待客户端响应...`);
 
-      // 登录后处理：调用各Manager的OnLogin方法
+      // 登录后处理：调用各Manager的OnLogin方法（在发送响应之后）
       await playerInstance.OnLogin();
+      
+      Logger.Info(`[LoginManager] OnLogin完成，玩家已完全登录`);
 
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

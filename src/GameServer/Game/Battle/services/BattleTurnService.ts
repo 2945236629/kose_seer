@@ -23,8 +23,6 @@ export class BattleTurnService {
   public ExecuteTurn(battle: IBattleInfo, playerSkillId: number): ITurnResult {
     // 增加回合数
     battle.turn++;
-    
-    Logger.Info(`[BattleTurnService] 回合 ${battle.turn}: 玩家使用技能 ${playerSkillId}`);
 
     // 获取技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
@@ -33,7 +31,6 @@ export class BattleTurnService {
     for (const skillId of battle.player.skills) {
       const skillMove = GameConfig.GetSkillById(skillId);
       if (skillMove) {
-        // 转换 ISkillMove 到 ISkillConfig
         const skillConfig: ISkillConfig = {
           id: skillMove.ID,
           name: skillMove.Name,
@@ -49,10 +46,6 @@ export class BattleTurnService {
           sideEffectArg: skillMove.SideEffectArg
         };
         skillConfigs.set(skillId, skillConfig);
-        Logger.Debug(
-          `[BattleTurnService] 加载玩家技能: ${skillId} - ${skillConfig.name}, ` +
-          `副作用=${skillConfig.sideEffect || '无'}`
-        );
       }
     }
     
@@ -60,7 +53,6 @@ export class BattleTurnService {
     for (const skillId of battle.enemy.skills) {
       const skillMove = GameConfig.GetSkillById(skillId);
       if (skillMove) {
-        // 转换 ISkillMove 到 ISkillConfig
         const skillConfig: ISkillConfig = {
           id: skillMove.ID,
           name: skillMove.Name,
@@ -76,10 +68,6 @@ export class BattleTurnService {
           sideEffectArg: skillMove.SideEffectArg
         };
         skillConfigs.set(skillId, skillConfig);
-        Logger.Debug(
-          `[BattleTurnService] 加载敌人技能: ${skillId} - ${skillConfig.name}, ` +
-          `副作用=${skillConfig.sideEffect || '无'}`
-        );
       }
     }
 
@@ -92,8 +80,6 @@ export class BattleTurnService {
    * 用于捕捉失败、使用道具等场景
    */
   public ExecuteEnemyTurn(battle: IBattleInfo): IAttackResult {
-    Logger.Info(`[BattleTurnService] 敌人回合: 玩家使用道具，敌人反击`);
-
     // 获取技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
     
@@ -152,7 +138,7 @@ export class BattleTurnService {
       };
     }
 
-    Logger.Debug(`[BattleTurnService] 敌人使用技能: ${enemySkill.name} (ID=${enemySkill.id})`);
+    Logger.Info(`[敌人反击] 使用${enemySkill.name}`);
 
     // 检查敌人是否可以行动
     const enemyCanAct = BattleCore.CanAct(battle.enemy);

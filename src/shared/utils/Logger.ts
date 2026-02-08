@@ -154,8 +154,22 @@ interface ILogOptions {
   Tag?: string;
 }
 
+// 控制台接口（用于与 ConsoleCommands 集成）
+interface IConsoleInterface {
+  clearLine(): void;
+  restoreLine(): void;
+}
+
 export class Logger {
   private static _minLevel: LogLevel = LogLevel.Info;
+  private static _consoleInterface: IConsoleInterface | null = null;
+
+  /**
+   * 设置控制台接口（用于日志与输入提示符的协调）
+   */
+  public static SetConsoleInterface(consoleInterface: IConsoleInterface | null): void {
+    Logger._consoleInterface = consoleInterface;
+  }
 
   /**
    * 初始化日志系统（从配置加载）
@@ -177,12 +191,40 @@ export class Logger {
     return levels.indexOf(level) >= levels.indexOf(Logger._minLevel);
   }
 
+  /**
+   * 输出日志（处理与控制台提示符的协调）
+   * 日志始终在命令提示符上方显示
+   */
+  private static Output(message: string, isError: boolean = false): void {
+    if (Logger._consoleInterface) {
+      // 清除当前行（命令提示符）
+      Logger._consoleInterface.clearLine();
+      
+      // 输出日志到上方
+      if (isError) {
+        console.error(message);
+      } else {
+        console.log(message);
+      }
+      
+      // 恢复命令提示符到底部
+      Logger._consoleInterface.restoreLine();
+    } else {
+      // 如果没有控制台接口，直接输出
+      if (isError) {
+        console.error(message);
+      } else {
+        console.log(message);
+      }
+    }
+  }
+
   public static Debug(message: string, options?: ILogOptions): void {
     if (!Logger.ShouldLog(LogLevel.Debug))
       return;
     const stackInfo = GetStackInfo();
     const formattedMessage = FormatMessage(LogLevel.Debug, message, stackInfo, options?.Tag);
-    console.log(formattedMessage);
+    Logger.Output(formattedMessage);
   }
 
   public static Info(message: string, options?: ILogOptions): void {
@@ -190,7 +232,7 @@ export class Logger {
       return;
     const stackInfo = GetStackInfo();
     const formattedMessage = FormatMessage(LogLevel.Info, message, stackInfo, options?.Tag);
-    console.log(formattedMessage);
+    Logger.Output(formattedMessage);
   }
 
   public static Warn(message: string, options?: ILogOptions): void {
@@ -198,7 +240,7 @@ export class Logger {
       return;
     const stackInfo = GetStackInfo();
     const formattedMessage = FormatMessage(LogLevel.Warn, message, stackInfo, options?.Tag);
-    console.warn(formattedMessage);
+    Logger.Output(formattedMessage);
   }
 
   public static Error(message: string, error?: Error, options?: ILogOptions): void {
@@ -206,10 +248,10 @@ export class Logger {
       return;
     const stackInfo = GetStackInfo();
     const formattedMessage = FormatMessage(LogLevel.Error, message, stackInfo, options?.Tag);
-    console.error(formattedMessage);
+    Logger.Output(formattedMessage, true);
 
     if (error) {
-      console.error(FormatStack(error));
+      Logger.Output(FormatStack(error), true);
     }
   }
 }

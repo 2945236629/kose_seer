@@ -16,9 +16,9 @@ export class PetService {
    * 发送精灵（使用 GameServer 的实际实现）
    */
   public async givePet(
-    uid: number, 
-    petId: number, 
-    level: number, 
+    uid: number,
+    petId: number,
+    level: number,
     shiny: boolean,
     customStats?: {
       dvHp?: number;
@@ -35,6 +35,13 @@ export class PetService {
       evSpeed?: number;
       nature?: number;
       skills?: number[];
+      effectList?: Array<{
+        itemId: number;
+        status: number;
+        leftCount: number;
+        effectID: number;
+        args: string;
+      }>;
     }
   ): Promise<void> {
     const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
@@ -60,21 +67,41 @@ export class PetService {
     
     // 如果提供了自定义属性，应用它们
     if (customStats) {
-      if (customStats.dvHp !== undefined) newPet.dvHp = Math.max(0, Math.min(31, customStats.dvHp));
-      if (customStats.dvAtk !== undefined) newPet.dvAtk = Math.max(0, Math.min(31, customStats.dvAtk));
-      if (customStats.dvDef !== undefined) newPet.dvDef = Math.max(0, Math.min(31, customStats.dvDef));
-      if (customStats.dvSpAtk !== undefined) newPet.dvSpAtk = Math.max(0, Math.min(31, customStats.dvSpAtk));
-      if (customStats.dvSpDef !== undefined) newPet.dvSpDef = Math.max(0, Math.min(31, customStats.dvSpDef));
-      if (customStats.dvSpeed !== undefined) newPet.dvSpeed = Math.max(0, Math.min(31, customStats.dvSpeed));
-      
-      if (customStats.evHp !== undefined) newPet.evHp = Math.max(0, Math.min(255, customStats.evHp));
-      if (customStats.evAtk !== undefined) newPet.evAtk = Math.max(0, Math.min(255, customStats.evAtk));
-      if (customStats.evDef !== undefined) newPet.evDef = Math.max(0, Math.min(255, customStats.evDef));
-      if (customStats.evSpAtk !== undefined) newPet.evSpAtk = Math.max(0, Math.min(255, customStats.evSpAtk));
-      if (customStats.evSpDef !== undefined) newPet.evSpDef = Math.max(0, Math.min(255, customStats.evSpDef));
-      if (customStats.evSpeed !== undefined) newPet.evSpeed = Math.max(0, Math.min(255, customStats.evSpeed));
-      
+      if (customStats.dvHp !== undefined) newPet.dvHp = Math.max(0, customStats.dvHp);
+      if (customStats.dvAtk !== undefined) newPet.dvAtk = Math.max(0, customStats.dvAtk);
+      if (customStats.dvDef !== undefined) newPet.dvDef = Math.max(0, customStats.dvDef);
+      if (customStats.dvSpAtk !== undefined) newPet.dvSpAtk = Math.max(0, customStats.dvSpAtk);
+      if (customStats.dvSpDef !== undefined) newPet.dvSpDef = Math.max(0, customStats.dvSpDef);
+      if (customStats.dvSpeed !== undefined) newPet.dvSpeed = Math.max(0, customStats.dvSpeed);
+
+      if (customStats.evHp !== undefined) newPet.evHp = Math.max(0, customStats.evHp);
+      if (customStats.evAtk !== undefined) newPet.evAtk = Math.max(0, customStats.evAtk);
+      if (customStats.evDef !== undefined) newPet.evDef = Math.max(0, customStats.evDef);
+      if (customStats.evSpAtk !== undefined) newPet.evSpAtk = Math.max(0, customStats.evSpAtk);
+      if (customStats.evSpDef !== undefined) newPet.evSpDef = Math.max(0, customStats.evSpDef);
+      if (customStats.evSpeed !== undefined) newPet.evSpeed = Math.max(0, customStats.evSpeed);
+
       if (customStats.nature !== undefined) newPet.nature = Math.max(0, Math.min(24, customStats.nature));
+
+      if (customStats.effectList && customStats.effectList.length > 0) {
+        // 从 pet_abilities.json 补全参数和 itemId
+        for (const effect of customStats.effectList) {
+          if (effect.effectID > 0) {
+            const abilityConfig = GameConfig.GetPetAbilityById(effect.effectID);
+            if (abilityConfig) {
+              if (!effect.args) {
+                effect.args = abilityConfig.args.join(' ');
+              }
+              // 客户端用 itemId 显示特性，确保 itemId = abilityId
+              if (!effect.itemId) {
+                effect.itemId = effect.effectID;
+              }
+            }
+          }
+        }
+        newPet.effectList = customStats.effectList;
+        newPet.effectCount = customStats.effectList.length;
+      }
     }
     
     // 使用 PetCalculator 计算正确的属性
@@ -209,40 +236,40 @@ export class PetService {
         pet.exp = value;
         break;
       case 'evHp':
-        pet.evHp = Math.max(0, Math.min(255, value));
+        pet.evHp = Math.max(0, value);
         break;
       case 'evAtk':
-        pet.evAtk = Math.max(0, Math.min(255, value));
+        pet.evAtk = Math.max(0, value);
         break;
       case 'evDef':
-        pet.evDef = Math.max(0, Math.min(255, value));
+        pet.evDef = Math.max(0, value);
         break;
       case 'evSpAtk':
-        pet.evSpAtk = Math.max(0, Math.min(255, value));
+        pet.evSpAtk = Math.max(0, value);
         break;
       case 'evSpDef':
-        pet.evSpDef = Math.max(0, Math.min(255, value));
+        pet.evSpDef = Math.max(0, value);
         break;
       case 'evSpeed':
-        pet.evSpeed = Math.max(0, Math.min(255, value));
+        pet.evSpeed = Math.max(0, value);
         break;
       case 'dvHp':
-        pet.dvHp = Math.max(0, Math.min(31, value));
+        pet.dvHp = Math.max(0, value);
         break;
       case 'dvAtk':
-        pet.dvAtk = Math.max(0, Math.min(31, value));
+        pet.dvAtk = Math.max(0, value);
         break;
       case 'dvDef':
-        pet.dvDef = Math.max(0, Math.min(31, value));
+        pet.dvDef = Math.max(0, value);
         break;
       case 'dvSpAtk':
-        pet.dvSpAtk = Math.max(0, Math.min(31, value));
+        pet.dvSpAtk = Math.max(0, value);
         break;
       case 'dvSpDef':
-        pet.dvSpDef = Math.max(0, Math.min(31, value));
+        pet.dvSpDef = Math.max(0, value);
         break;
       case 'dvSpeed':
-        pet.dvSpeed = Math.max(0, Math.min(31, value));
+        pet.dvSpeed = Math.max(0, value);
         break;
       case 'nature':
         pet.nature = value;
@@ -285,6 +312,13 @@ export class PetService {
     dvSpDef?: number;
     dvSpeed?: number;
     skills?: number[];
+    effectList?: Array<{
+      itemId: number;
+      status: number;
+      leftCount: number;
+      effectID: number;
+      args: string;
+    }>;
   }): Promise<void> {
     // 使用 GetInstanceOrCreateNew 以支持离线玩家
     const petData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PetData(uid);
@@ -340,20 +374,42 @@ export class PetService {
     }
 
     // 更新努力值
-    if (updateData.evHp !== undefined) pet.evHp = Math.max(0, Math.min(255, updateData.evHp));
-    if (updateData.evAtk !== undefined) pet.evAtk = Math.max(0, Math.min(255, updateData.evAtk));
-    if (updateData.evDef !== undefined) pet.evDef = Math.max(0, Math.min(255, updateData.evDef));
-    if (updateData.evSpAtk !== undefined) pet.evSpAtk = Math.max(0, Math.min(255, updateData.evSpAtk));
-    if (updateData.evSpDef !== undefined) pet.evSpDef = Math.max(0, Math.min(255, updateData.evSpDef));
-    if (updateData.evSpeed !== undefined) pet.evSpeed = Math.max(0, Math.min(255, updateData.evSpeed));
+    if (updateData.evHp !== undefined) pet.evHp = Math.max(0, updateData.evHp);
+    if (updateData.evAtk !== undefined) pet.evAtk = Math.max(0, updateData.evAtk);
+    if (updateData.evDef !== undefined) pet.evDef = Math.max(0, updateData.evDef);
+    if (updateData.evSpAtk !== undefined) pet.evSpAtk = Math.max(0, updateData.evSpAtk);
+    if (updateData.evSpDef !== undefined) pet.evSpDef = Math.max(0, updateData.evSpDef);
+    if (updateData.evSpeed !== undefined) pet.evSpeed = Math.max(0, updateData.evSpeed);
 
     // 更新个体值
-    if (updateData.dvHp !== undefined) pet.dvHp = Math.max(0, Math.min(31, updateData.dvHp));
-    if (updateData.dvAtk !== undefined) pet.dvAtk = Math.max(0, Math.min(31, updateData.dvAtk));
-    if (updateData.dvDef !== undefined) pet.dvDef = Math.max(0, Math.min(31, updateData.dvDef));
-    if (updateData.dvSpAtk !== undefined) pet.dvSpAtk = Math.max(0, Math.min(31, updateData.dvSpAtk));
-    if (updateData.dvSpDef !== undefined) pet.dvSpDef = Math.max(0, Math.min(31, updateData.dvSpDef));
-    if (updateData.dvSpeed !== undefined) pet.dvSpeed = Math.max(0, Math.min(31, updateData.dvSpeed));
+    if (updateData.dvHp !== undefined) pet.dvHp = Math.max(0, updateData.dvHp);
+    if (updateData.dvAtk !== undefined) pet.dvAtk = Math.max(0, updateData.dvAtk);
+    if (updateData.dvDef !== undefined) pet.dvDef = Math.max(0, updateData.dvDef);
+    if (updateData.dvSpAtk !== undefined) pet.dvSpAtk = Math.max(0, updateData.dvSpAtk);
+    if (updateData.dvSpDef !== undefined) pet.dvSpDef = Math.max(0, updateData.dvSpDef);
+    if (updateData.dvSpeed !== undefined) pet.dvSpeed = Math.max(0, updateData.dvSpeed);
+
+    // 更新特性列表
+    if (updateData.effectList !== undefined) {
+      // 从 pet_abilities.json 补全参数和 itemId
+      for (const effect of updateData.effectList) {
+        if (effect.effectID > 0) {
+          const abilityConfig = GameConfig.GetPetAbilityById(effect.effectID);
+          if (abilityConfig) {
+            if (!effect.args) {
+              effect.args = abilityConfig.args.join(' ');
+            }
+            // 客户端用 itemId 显示特性，确保 itemId = abilityId
+            if (!effect.itemId) {
+              effect.itemId = effect.effectID;
+            }
+          }
+        }
+      }
+      pet.effectList = updateData.effectList;
+      pet.effectCount = updateData.effectList.length;
+      Logger.Info(`[PetService] 更新特性: ${JSON.stringify(pet.effectList)}`);
+    }
 
     // 更新技能
     if (updateData.skills && updateData.skills.length > 0) {

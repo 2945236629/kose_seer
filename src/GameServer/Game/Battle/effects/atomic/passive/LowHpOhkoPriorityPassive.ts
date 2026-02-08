@@ -3,8 +3,8 @@ import { IEffectContext, IEffectResult, EffectTiming } from '../../core/EffectCo
 import { AtomicEffectType } from '../core/IAtomicEffect';
 
 /**
- * 低血秒杀先手 (2023)
- * 自身体力降到N以下时，每次攻击必定秒杀对方且必定先手
+ * 低血秒杀先制 (2023)
+ * 自身体力降到N%以下时，先制+6且每次攻击必定秒杀对方
  * effectArgs: [thresholdHigh, thresholdLow]
  */
 export class LowHpOhkoPriorityPassive extends BaseAtomicEffect {
@@ -19,20 +19,33 @@ export class LowHpOhkoPriorityPassive extends BaseAtomicEffect {
     const attacker = this.getAttacker(context);
     const thresholdHigh = context.effectArgs?.[0] || 0;
     const thresholdLow = context.effectArgs?.[1] || 0;
-    const threshold = (thresholdHigh << 16) | thresholdLow;
 
-    if (attacker.hp > 0 && attacker.hp < threshold) {
+    // 确定是否低于阈值
+    let belowThreshold: boolean;
+    let threshold: number;
+    if (thresholdHigh === 0 && thresholdLow > 0 && thresholdLow <= 100) {
+      // 百分比模式: args=[0, 50] → hp * 2 < maxHp（原版条件）
+      // 使用乘法避免整除误差：hp * (100/percent) < maxHp
+      threshold = thresholdLow;
+      const multiplier = Math.floor(100 / thresholdLow);
+      belowThreshold = attacker.hp * multiplier < attacker.maxHp;
+    } else {
+      // 固定HP模式: args=[high, low] → HP < (high << 16 | low)
+      threshold = (thresholdHigh << 16) | thresholdLow;
+      belowThreshold = attacker.hp < threshold;
+    }
+
+    if (attacker.hp > 0 && belowThreshold) {
       if (context.timing === EffectTiming.BEFORE_SPEED_CHECK) {
-        context.alwaysFirst = true;
-        context.priorityModifier += 999;
-        results.push(this.createResult(true, 'attacker', 'low_hp_priority',
-          `${attacker.name} 低血必先手`, 0, { threshold }));
+        context.priorityModifier += 6;
+        results.push(this.createResult(true, 'attacker', 'low_hp_ohko',
+          `${attacker.name} 低血先制+6`, 6, { threshold }));
       } else if (context.timing === EffectTiming.BEFORE_DAMAGE_CALC) {
         const defender = this.getDefender(context);
         context.instantKill = true;
         context.damage = defender.hp;
-        this.log(`低血秒杀先手: ${attacker.name} HP=${attacker.hp} < ${threshold}, 秒杀`, 'info');
-        results.push(this.createResult(true, 'attacker', 'low_hp_ohko',
+        this.log(`低血秒杀先手: ${attacker.name} HP=${attacker.hp}, 低于阈值${threshold}%, 秒杀`, 'info');
+        results.push(this.createResult(true, 'attacker', 'instant_kill',
           `${attacker.name} 发动秒杀`, defender.hp, { threshold }));
       }
     }

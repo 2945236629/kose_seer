@@ -30,11 +30,16 @@ export interface INatureModifiers {
 
 /**
  * 技能类型枚举
+ * 
+ * 注意：XML中的Category值：
+ * - 1 = 物理攻击
+ * - 2 = 特殊攻击
+ * - 4 = 变化技能（STATUS）
  */
 export enum SkillCategory {
   PHYSICAL = 1,   // 物理攻击
   SPECIAL = 2,    // 特殊攻击
-  STATUS = 3,     // 属性攻击(变化技)
+  STATUS = 4,     // 变化技能（XML中为4，不是3）
 }
 
 /**

@@ -34,6 +34,9 @@ configRouter.get('/search/skills', configController.searchSkills);
 // 搜索指定精灵的技能选项（分页）
 configRouter.get('/search/pet-skills/:petId', configController.searchPetSkills);
 
+// 搜索特性选项（分页）
+configRouter.get('/search/abilities', configController.searchAbilities);
+
 // 获取配置数据
 configRouter.get('/:type', configController.getConfig);
 

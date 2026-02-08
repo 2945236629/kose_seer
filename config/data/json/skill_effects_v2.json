@@ -12280,7 +12280,7 @@
         "BEFORE_TURN_ORDER",
         "BEFORE_DAMAGE_CALC"
       ],
-      "description": "自身体力降到N以下时，每次攻击必定秒杀对方且必定先手",
+      "description": "自身体力降到N%以下时，先制+6且每次攻击必定秒杀对方",
       "implemented": true,
       "implementClass": "LowHpOhkoPriorityPassive",
       "args": [
@@ -12288,14 +12288,14 @@
           "index": 0,
           "name": "thresholdHigh",
           "type": "number",
-          "description": "血量阈值高16位",
+          "description": "血量阈值高16位（为0时启用百分比模式）",
           "default": 0
         },
         {
           "index": 1,
           "name": "thresholdLow",
           "type": "number",
-          "description": "血量阈值低16位",
+          "description": "血量阈值低16位（百分比模式下为百分比值0-100）",
           "default": 0
         }
       ],
@@ -12311,7 +12311,7 @@
       "passiveConfig": {
         "role": "attacker"
       },
-      "notes": "BOSS特性23 - 体力低于阈值时攻击必定秒杀且先手"
+      "notes": "BOSS特性23 - 体力低于阈值时攻击必定秒杀且先制+6（非绝对先手）"
     },
     {
       "effectId": 2024,

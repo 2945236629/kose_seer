@@ -23,7 +23,7 @@ export class TypeOhkoPassive extends BaseAtomicEffect {
       context.instantKill = true;
       context.damage = defender.hp;
       this.log(`属性秒杀: 目标属性 ${defender.type} 在秒杀列表中`, 'info');
-      results.push(this.createResult(true, 'attacker', 'type_ohko',
+      results.push(this.createResult(true, 'attacker', 'instant_kill',
         `对属性 ${defender.type} 发动秒杀`, defender.hp,
         { targetTypes, defenderType: defender.type }));
     }

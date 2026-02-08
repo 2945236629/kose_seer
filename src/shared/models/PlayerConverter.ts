@@ -88,10 +88,7 @@ export function PlayerInfoToLoginProto(player: IPlayerInfo, sessionKey?: string)
   proto.nonoColor = player.nonoColor || 0;
   proto.nonoNick = player.nonoNick || 'NoNo'; // 和Lua端默认值一致
   proto.badge = player.badge || 0;
-  
-  // 调试日志：输出NoNo相关字段
-  console.log(`[PlayerConverter] NoNo数据: hasNono=${proto.hasNono}, nonoFlag=${player.nonoFlag}, nonoState(发送nonoFlag)=${proto.nonoState} (0b${proto.nonoState.toString(2).padStart(8, '0')}), nonoNick="${proto.nonoNick}", nonoColor=0x${proto.nonoColor.toString(16)}`);
-  
+
   return proto;
 }
 

@@ -1,4 +1,16 @@
 /**
+ * 精灵特性信息接口
+ * 参考客户端 PetEffectInfo.as
+ */
+export interface IPetEffectInfo {
+  itemId: number;                // 特性物品ID
+  status: number;                // 特性状态（2=已激活）
+  leftCount: number;             // 剩余使用次数
+  effectID: number;              // 特性ID
+  args: string;                  // 参数字符串
+}
+
+/**
  * 精灵信息接口
  */
 export interface IPetInfo {
@@ -29,6 +41,7 @@ export interface IPetInfo {
   dvSpeed: number;               // 速度个体值
   nature: number;                // 性格
   skillArray: number[];          // 技能列表
+  effectList: IPetEffectInfo[];  // 特性列表
   isDefault: boolean;            // 是否首发
   isInBag: boolean;              // 是否在背包（false=在仓库）
   position: number;              // 背包位置
@@ -75,6 +88,7 @@ export function createDefaultPetInfo(userId: number, petId: number): IPetInfo {
     dvSpeed: Math.floor(Math.random() * 32),   // 0-31
     nature: Math.floor(Math.random() * 25),     // 0-24（性格ID范围）
     skillArray: [],
+    effectList: [],
     isDefault: false,
     isInBag: true,
     position: 0,

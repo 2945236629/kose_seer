@@ -27,15 +27,15 @@ export class PassiveAbilitySystem {
     pet: IBattlePet,
     _opponent: IBattlePet
   ): IEffectResult[] {
-    // 从配置读取BOSS特性
-    const abilityIds = BossAbilityConfig.Instance.GetAbilities(pet.petId);
+    // 从配置读取BOSS特性（含参数）
+    const abilityEntries = BossAbilityConfig.Instance.GetAbilityEntries(pet.petId);
 
-    if (abilityIds.length === 0) {
+    if (abilityEntries.length === 0) {
       return [];
     }
 
     // 委托给 BossAbilityManager → PassiveEffectRunner 注册
-    BossAbilityManager.InitializeBossAbilities(pet, abilityIds);
+    BossAbilityManager.InitializeBossAbilities(pet, abilityEntries);
 
     return [];
   }

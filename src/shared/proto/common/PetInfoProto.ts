@@ -10,12 +10,16 @@ export interface IPetSkill {
 }
 
 /**
- * 精灵效果信息
+ * 精灵效果信息（对应客户端 PetEffectInfo）
+ * 固定 24 字节
  */
 export interface IPetEffect {
-  effectID: number;
-  leftRound: number;
-  // ... 其他效果字段
+  itemId: number;      // 物品ID (UInt32)
+  status: number;      // 状态 (UInt8) 2=已激活
+  leftCount: number;   // 剩余次数 (UInt8)
+  effectID: number;    // 特性ID (UInt16)
+  arg1: number;        // 参数1 (UInt8)
+  arg2: number;        // 参数2 (UInt8)
 }
 
 /**
@@ -109,8 +113,22 @@ export class PetInfoProto extends BaseProto {
     
     // 6. 效果列表
     writer.WriteUInt16(this.effects.length);
-    // TODO: 如果有效果，写入效果数据
-    
+    console.log(`[PetInfoProto] 精灵 ${this.id} 特性数量: ${this.effects.length}`);
+    for (const effect of this.effects) {
+      console.log(`[PetInfoProto] 写入特性: effectID=${effect.effectID}, itemId=${effect.itemId}, status=${effect.status}, leftCount=${effect.leftCount}, arg1=${effect.arg1}, arg2=${effect.arg2}`);
+      writer.WriteUInt32(effect.itemId);        // 4 bytes
+      writer.WriteUInt8(effect.status);          // 1 byte
+      writer.WriteUInt8(effect.leftCount);       // 1 byte
+      writer.WriteUInt16(effect.effectID);       // 2 bytes
+      writer.WriteUInt8(effect.arg1);            // 1 byte
+      writer.WriteUInt8(0);                      // 1 byte (unused)
+      writer.WriteUInt8(effect.arg2);            // 1 byte
+      // 13 bytes padding (total 24 bytes per effect)
+      for (let p = 0; p < 13; p++) {
+        writer.WriteUInt8(0);
+      }
+    }
+
     // 7. 皮肤
     writer.WriteUInt32(this.skinID);
     

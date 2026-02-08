@@ -35,6 +35,12 @@
           <el-menu-item index="/config/unique-items" class="pl-12">
             <span class="text-sm">特殊物品</span>
           </el-menu-item>
+          <el-menu-item index="/config/default-player" class="pl-12">
+            <span class="text-sm">默认玩家配置</span>
+          </el-menu-item>
+          <el-menu-item index="/config/shop" class="pl-12">
+            <span class="text-sm">商店配置</span>
+          </el-menu-item>
         </el-sub-menu>
         
         <el-sub-menu index="2">

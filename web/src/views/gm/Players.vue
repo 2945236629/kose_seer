@@ -525,36 +525,36 @@
           <div v-show="showAdvancedOptions" class="advanced-options">
             <!-- 个体值 -->
             <div class="form-section">
-              <div class="section-title">个体值 (DV/IV) 0-31</div>
+              <div class="section-title">个体值 (DV/IV)</div>
               <el-row :gutter="12">
                 <el-col :span="4">
                   <el-form-item label="HP" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvHp" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvHp" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="攻击" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvAtk" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvAtk" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="防御" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvDef" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvDef" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="特攻" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvSpAtk" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvSpAtk" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="特防" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvSpDef" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvSpDef" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="速度" label-width="40px">
-                    <el-input-number v-model="addPetForm.dvSpeed" :min="0" :max="31" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.dvSpeed" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -566,36 +566,36 @@
 
             <!-- 努力值 -->
             <div class="form-section">
-              <div class="section-title">努力值 (EV) 0-255</div>
+              <div class="section-title">努力值 (EV)</div>
               <el-row :gutter="12">
                 <el-col :span="4">
                   <el-form-item label="HP" label-width="40px">
-                    <el-input-number v-model="addPetForm.evHp" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evHp" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="攻击" label-width="40px">
-                    <el-input-number v-model="addPetForm.evAtk" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evAtk" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="防御" label-width="40px">
-                    <el-input-number v-model="addPetForm.evDef" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evDef" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="特攻" label-width="40px">
-                    <el-input-number v-model="addPetForm.evSpAtk" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evSpAtk" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="特防" label-width="40px">
-                    <el-input-number v-model="addPetForm.evSpDef" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evSpDef" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="4">
                   <el-form-item label="速度" label-width="40px">
-                    <el-input-number v-model="addPetForm.evSpeed" :min="0" :max="255" size="small" style="width: 100%" controls-position="right" />
+                    <el-input-number v-model="addPetForm.evSpeed" :min="0" size="small" style="width: 100%" controls-position="right" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -668,6 +668,25 @@
                       :fetch-data="fetchSkillData"
                     />
                   </el-form-item>
+                </el-col>
+              </el-row>
+            </div>
+
+            <!-- 特性 -->
+            <div class="form-section">
+              <div class="section-title">特性（每个精灵只能拥有一个）</div>
+              <el-row :gutter="12">
+                <el-col :span="18">
+                  <el-form-item label="特性" label-width="80px">
+                    <PaginatedSelect
+                      v-model="addPetForm.abilityId"
+                      placeholder="无特性"
+                      :fetch-data="fetchAbilityData"
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="6">
+                  <el-button size="small" @click="addPetForm.abilityId = 0">清除特性</el-button>
                 </el-col>
               </el-row>
             </div>
@@ -873,7 +892,9 @@ const addPetForm = ref({
   skill1: 0,
   skill2: 0,
   skill3: 0,
-  skill4: 0
+  skill4: 0,
+  // 特性（只能一个，0=无特性）
+  abilityId: 0
 })
 const natureOptions = ref<any[]>([])
 const showAdvancedOptions = ref(false)
@@ -893,6 +914,12 @@ const fetchSkillData = async (query: string, page: number, pageSize: number) => 
 // 获取物品数据（用于分页选择器）
 const fetchItemData = async (query: string, page: number, pageSize: number) => {
   const res = await configApi.searchItems(query, page, pageSize) as any
+  return res.data || res
+}
+
+// 获取特性数据（用于分页选择器）
+const fetchAbilityData = async (query: string, page: number, pageSize: number) => {
+  const res = await configApi.searchAbilities(query, page, pageSize) as any
   return res.data || res
 }
 
@@ -1118,7 +1145,9 @@ const handleAddPet = async () => {
     skill1: 0,
     skill2: 0,
     skill3: 0,
-    skill4: 0
+    skill4: 0,
+    // 特性
+    abilityId: 0
   }
   
   showAdvancedOptions.value = false
@@ -1158,6 +1187,7 @@ const clearEV = () => {
   ElMessage.success('已清空努力值')
 }
 
+// 添加特性
 // 确认添加精灵
 const confirmAddPet = async () => {
   try {
@@ -1189,7 +1219,9 @@ const confirmAddPet = async () => {
         addPetForm.value.skill2,
         addPetForm.value.skill3,
         addPetForm.value.skill4
-      ].filter(s => s > 0)
+      ].filter(s => s > 0),
+      // 特性（单个）
+      effectList: addPetForm.value.abilityId > 0 ? [{ itemId: addPetForm.value.abilityId, status: 2, leftCount: -1, effectID: addPetForm.value.abilityId, args: '' }] : undefined
     } : undefined
     
     // 检查是否选择了自定义技能

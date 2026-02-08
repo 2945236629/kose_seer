@@ -19,6 +19,7 @@ import { EffectTiming, IEffectContext, IEffectResult, createEffectContext } from
 import { AtomicEffectFactory } from './effects/atomic/core/AtomicEffectFactory';
 import { IAtomicEffectParams } from './effects/atomic/core/IAtomicEffect';
 import { SkillEffectsConfig } from '../../../shared/config/game/SkillEffectsConfig';
+import { IAbilityEntry } from './BossAbility/BossAbilityConfig';
 
 // ==================== 接口定义 ====================
 
@@ -78,10 +79,11 @@ export class PassiveEffectRunner {
    *
    * 从 skill_effects_v2.json 读取特性配置，解析为原子效果组合，
    * 存储在精灵的 effectCounters 中。
+   * 支持通过 IAbilityEntry.args 覆盖默认参数。
    *
    * 对于免疫类特性，同时设置 immuneFlags 以供快速判断。
    */
-  public static RegisterPassives(pet: IBattlePet, abilityIds: number[]): void {
+  public static RegisterPassives(pet: IBattlePet, abilityEntries: IAbilityEntry[]): void {
     if (!pet.effectCounters) {
       pet.effectCounters = {};
     }
@@ -91,8 +93,8 @@ export class PassiveEffectRunner {
 
     const passives: IRegisteredPassive[] = [];
 
-    for (const abilityId of abilityIds) {
-      const passive = this.BuildPassiveFromConfig(abilityId);
+    for (const entry of abilityEntries) {
+      const passive = this.BuildPassiveFromConfig(entry.id, entry.args);
       if (!passive) continue;
 
       passives.push(passive);
@@ -109,7 +111,7 @@ export class PassiveEffectRunner {
 
       Logger.Info(
         `[PassiveEffectRunner] 注册被动特性: ${pet.name} - ${passive.name} ` +
-        `(ID=${abilityId}, 时机=[${passive.timings.join(',')}], 角色=${passive.role})`
+        `(ID=${entry.id}, 时机=[${passive.timings.join(',')}], 角色=${passive.role})`
       );
     }
 
@@ -213,8 +215,11 @@ export class PassiveEffectRunner {
 
   /**
    * 从 JSON 配置构建一个被动特性
+   *
+   * @param abilityId 特性ID
+   * @param overrideArgs 覆盖参数（来自 boss_abilities.json）
    */
-  private static BuildPassiveFromConfig(abilityId: number): IRegisteredPassive | null {
+  private static BuildPassiveFromConfig(abilityId: number, overrideArgs?: number[]): IRegisteredPassive | null {
     const config = SkillEffectsConfig.Instance.GetEffectById(abilityId);
     if (!config) {
       Logger.Warn(`[PassiveEffectRunner] 特性配置不存在: ${abilityId}`);
@@ -243,8 +248,8 @@ export class PassiveEffectRunner {
     // 解析原子效果配置
     const atoms = this.ParseAtoms(config);
 
-    // 解析参数值
-    const argValues = this.ResolveArgValues(config);
+    // 解析参数值（overrideArgs 优先于默认值）
+    const argValues = this.ResolveArgValues(config, overrideArgs);
 
     return {
       effectId: abilityId,
@@ -352,12 +357,20 @@ export class PassiveEffectRunner {
   }
 
   /**
-   * 解析参数默认值
+   * 解析参数值
+   *
+   * 优先使用 overrideArgs（来自 boss_abilities.json），
+   * 未提供时回退到 config.args[].default。
    */
-  private static ResolveArgValues(config: any): number[] {
+  private static ResolveArgValues(config: any, overrideArgs?: number[]): number[] {
     if (!config.args || config.args.length === 0) return [];
 
-    return config.args.map((arg: any) => {
+    return config.args.map((arg: any, index: number) => {
+      // 优先使用覆盖参数
+      if (overrideArgs && index < overrideArgs.length) {
+        return overrideArgs[index];
+      }
+      // 回退到默认值
       const val = arg.default;
       return typeof val === 'number' ? val : 0;
     });

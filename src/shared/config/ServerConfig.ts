@@ -94,7 +94,7 @@ export class ServerConfig {
    */
   private LoadConfig(): IServerConfig {
     const configPath = ConfigPaths[ConfigKeys.SERVER_CONFIG];
-    Logger.Info(`[ServerConfig] 正在加载配置: ${configPath}`);
+    Logger.Info(`[ServerConfig] 准备加载配置: ${configPath}`);
     
     const config = ConfigLoader.Instance.LoadJson<IServerConfig>(configPath);
     

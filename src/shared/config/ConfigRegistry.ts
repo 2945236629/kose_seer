@@ -207,4 +207,12 @@ export class ConfigRegistry {
     }
     return result;
   }
+
+  /**
+   * 获取配置注册状态
+   * @returns GameServer配置注册状态
+   */
+  public GetIsInit(): boolean{
+    return this._initialized;
+  }
 }

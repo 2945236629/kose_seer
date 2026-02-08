@@ -64,9 +64,11 @@ export class PetData extends BaseData {
    * 转换为数据库行
    */
   public ToRow(): any {
+    const petListJson = JSON.stringify(this.PetList);
+
     return {
       owner_id: this.Uid,  // 修复：使用 owner_id
-      pet_list: JSON.stringify(this.PetList)
+      pet_list: petListJson
     };
   }
 

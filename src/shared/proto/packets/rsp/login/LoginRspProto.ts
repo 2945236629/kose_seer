@@ -245,11 +245,16 @@ export class LoginRspProto extends BaseProto {
     // reserved (27 bytes)
     writer.WriteBytes(Buffer.alloc(27));
 
+    const baseInfoSize = writer.ToBuffer().length;
+    console.log(`[LoginRspProto] 基础信息大小: ${baseInfoSize} bytes`);
+
     // ========== 任务列表 (500 bytes) ==========
     // TasksManager.taskList - 每个任务1字节状态
     for (let i = 0; i < 500; i++) {
       writer.WriteUInt8(this.taskList[i] || 0);
     }
+
+    console.log(`[LoginRspProto] 任务列表后大小: ${writer.ToBuffer().length} bytes (应该是 ${baseInfoSize + 500})`);
 
     // ========== 精灵数据 ==========
     // petNum (4 bytes)
@@ -262,18 +267,20 @@ export class LoginRspProto extends BaseProto {
     if (petCount > 0 && this.petList) {
       for (let i = 0; i < this.petList.length; i++) {
         const pet = this.petList[i];
-        console.log(`[LoginRspProto] 序列化精灵 ${i + 1}/${petCount}: PetId=${pet.id}, Level=${pet.level}, CatchTime=0x${pet.catchTime.toString(16)}`);
-        
+        const beforeSize = writer.ToBuffer().length;
         // 写入完整的精灵信息（使用 PetInfoProto 的简化版本）
         const petBytes = pet.serialize();
-        console.log(`[LoginRspProto] 精灵 ${i + 1} 序列化后字节数: ${petBytes.length}`);
         writer.WriteBytes(petBytes);
+        const afterSize = writer.ToBuffer().length;
+        console.log(`[LoginRspProto] 精灵 ${i + 1}/${petCount}: ${petBytes.length} bytes (总大小: ${afterSize})`);
       }
     }
 
     // ========== 服装数据 ==========
     // clothes count (4 bytes)
     writer.WriteUInt32(0); // 暂时没有服装
+    
+    console.log(`[LoginRspProto] 服装数量: 0`);
     
     // clothes data - 如果 count > 0，每个服装 8 bytes (id + level)
     // 暂时跳过，因为 count = 0
@@ -287,7 +294,7 @@ export class LoginRspProto extends BaseProto {
     }
 
     const buffer = writer.ToBuffer();
-    console.log(`[LoginRspProto] 序列化完成，总字节数: ${buffer.length}`);
+    console.log(`[LoginRspProto] 最终大小: ${buffer.length} bytes`);
     return buffer;
   }
 }

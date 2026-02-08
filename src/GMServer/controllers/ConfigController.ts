@@ -209,4 +209,20 @@ export class ConfigController {
       res.status(500).json({ success: false, error: (error as Error).message });
     }
   };
+
+  // 搜索特性选项（分页）
+  public searchAbilities = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { query = '', page = 1, pageSize = 50 } = req.query;
+      const result = await this.configService.searchAbilityOptions(
+        query as string,
+        parseInt(page as string),
+        parseInt(pageSize as string)
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      Logger.Error('[ConfigController] 搜索特性失败', error as Error);
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  };
 }

@@ -54,7 +54,7 @@ export class GameServer {
   private RegisterHandlers(): void {
     const registeredHandlers = Handlers.GetAll();
 
-    Logger.Info(`[GameServer] 开始注册 Handler，共 ${registeredHandlers.size} 个`);
+    Logger.Info(`[GameServer] 开始注册包处理器，共 ${registeredHandlers.size} 个`);
 
     for (const [cmdID, HandlerClass] of registeredHandlers) {
       let handler: IHandler;
@@ -78,21 +78,9 @@ export class GameServer {
       }
 
       this._handlers.set(cmdID, handler);
-      
-      // 记录任务相关的 Handler
-      if (cmdID >= 2200 && cmdID <= 2210) {
-        Logger.Info(`[GameServer] 注册任务 Handler: CMD=${cmdID}, Handler=${HandlerClass.name}`);
-      }
     }
 
     Logger.Info(`[GameServer] 已注册 ${this._handlers.size} 个命令处理器`);
-    
-    // 检查 CMD 2201 是否注册
-    if (this._handlers.has(2201)) {
-      Logger.Info(`[GameServer] ✓ CMD 2201 (ACCEPT_TASK) 已注册`);
-    } else {
-      Logger.Warn(`[GameServer] ✗ CMD 2201 (ACCEPT_TASK) 未注册！`);
-    }
   }
 
   /**
@@ -163,17 +151,17 @@ export class GameServer {
    */
   public async Start(): Promise<void> {
     if (this._running) return;
-
-    Logger.Info('[GameServer] 正在启动...');
-
     // 1. 注册游戏配置
-    Logger.Info('[GameServer] 注册游戏配置...');
-    const gameConfigs = GetGameConfigRegistrations();
-    ConfigRegistry.Instance.RegisterBatch(gameConfigs);
+    // 启动全部服务，Index会先注册配置，所以跳过再次注册
+    if (!ConfigRegistry.Instance.GetIsInit()) {
+      Logger.Info('[GameServer] 注册游戏配置...');
+      const gameConfigs = GetGameConfigRegistrations();
+      ConfigRegistry.Instance.RegisterBatch(gameConfigs);
+      // 2. 初始化配置系统
+      Logger.Info('[GameServer] 初始化配置系统...');
+      await ConfigRegistry.Instance.Initialize();
+    }
 
-    // 2. 初始化配置系统
-    Logger.Info('[GameServer] 初始化配置系统...');
-    await ConfigRegistry.Instance.Initialize();
 
     // 2.5. 加载技能效果配置（原子效果系统）
     Logger.Info('[GameServer] 加载技能效果配置...');
@@ -198,7 +186,8 @@ export class GameServer {
     Logger.Info('[GameServer] 启动自动保存任务...');
     const { AutoSaveTask } = await import('./Game/System/AutoSaveTask');
     AutoSaveTask.Instance.Start(300000); // 每300秒（5分钟）保存一次
-
+    
+    Logger.Info('[GameServer] 配置加载完成，游戏服务正在启动...');
     // 4. 启动网络服务
     this._server.listen(Config.Game.port, Config.Game.host, () => {
       this._running = true;
@@ -232,21 +221,21 @@ export class GameServer {
     // 4. 关闭数据库连接
     await DatabaseManager.Instance.Shutdown();
 
-    // 5. 关闭网络服务（使用Promise等待）
-    await new Promise<void>((resolve) => {
-      this._server.close(() => {
-        this._running = false;
-        Logger.Info('[GameServer] 网络服务已关闭');
-        resolve();
-      });
+    // // 5. 关闭网络服务（使用Promise等待）
+    // await new Promise<void>((resolve) => {
+    //   this._server.close(() => {
+    //     this._running = false;
+    //     Logger.Info('[GameServer] 网络服务已关闭');
+    //     resolve();
+    //   });
       
-      // 设置超时，防止卡住
-      setTimeout(() => {
-        Logger.Warn('[GameServer] 关闭网络服务超时，强制继续');
-        this._running = false;
-        resolve();
-      }, 5000);
-    });
+    //   // 设置超时，防止卡住
+    //   setTimeout(() => {
+    //     Logger.Warn('[GameServer] 关闭网络服务超时，强制继续');
+    //     this._running = false;
+    //     resolve();
+    //   }, 5000);
+    // });
     
     Logger.Info('[GameServer] 已停止');
   }

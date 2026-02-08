@@ -92,6 +92,13 @@ export const gmApi = {
     evSpeed?: number;
     nature?: number;
     skills?: number[];
+    effectList?: Array<{
+      itemId: number;
+      status: number;
+      leftCount: number;
+      effectID: number;
+      args: string;
+    }>;
   }) {
     return extractData(request.post(`/api/pets/${uid}`, { petId, level, shiny, customStats }))
   },
@@ -116,6 +123,13 @@ export const gmApi = {
     dvSpDef?: number;
     dvSpeed?: number;
     skills?: number[];
+    effectList?: Array<{
+      itemId: number;
+      status: number;
+      leftCount: number;
+      effectID: number;
+      args: string;
+    }>;
   }) {
     return extractData(request.patch(`/api/pets/${data.uid}`, data))
   },

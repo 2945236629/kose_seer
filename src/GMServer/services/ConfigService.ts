@@ -387,4 +387,42 @@ export class ConfigService {
     Logger.Info(`[ConfigService] 加载性格列表: ${config.natures.length} 种性格`);
     return config.natures;
   }
+
+  // 获取特性选项
+  private async getAbilityOptions(): Promise<any[]> {
+    const abilities = GameConfig.GetAllPetAbilities();
+    return abilities.map((ability: any) => ({
+      value: ability.abilityId,
+      label: `${ability.abilityId} - ${ability.name}`,
+      description: ability.description,
+      effectId: ability.effectId,
+      args: ability.args
+    }));
+  }
+
+  // 搜索特性选项（支持分页和搜索）
+  public async searchAbilityOptions(query: string = '', page: number = 1, pageSize: number = 50): Promise<{ items: any[], total: number }> {
+    const allOptions = await this.getAbilityOptions();
+
+    // 搜索过滤
+    let filtered = allOptions;
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = allOptions.filter(opt =>
+        opt.label.toLowerCase().includes(lowerQuery) ||
+        opt.value.toString().includes(query) ||
+        (opt.description && opt.description.toLowerCase().includes(lowerQuery))
+      );
+    }
+
+    // 分页
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const items = filtered.slice(start, end);
+
+    return {
+      items,
+      total: filtered.length
+    };
+  }
 }

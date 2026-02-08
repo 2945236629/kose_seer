@@ -78,12 +78,18 @@ export class BattleManager extends BaseManager {
 
     Logger.Debug(`[BattleManager] UpdateBattlePet: Skills=${JSON.stringify(finalSkills)}, PPs=${JSON.stringify(skillPPs)}`);
 
+    // 检查是否有战斗中的HP记录（切换回之前上过场的精灵）
+    const battleHp = this._battlePetHPMap.get(newPet.catchTime);
+    const actualHp = battleHp !== undefined ? battleHp : newPet.hp;
+    
+    Logger.Debug(`[BattleManager] UpdateBattlePet: CatchTime=${newPet.catchTime}, BattleHP=${battleHp}, DbHP=${newPet.hp}, ActualHP=${actualHp}`);
+
     // 更新基本属性
     battlePet.petId = newPet.petId;
     battlePet.id = newPet.petId;
     battlePet.name = newPet.nick || petConfig.DefName || 'Pet';
     battlePet.level = newPet.level;
-    battlePet.hp = newPet.hp;
+    battlePet.hp = actualHp;  // 使用战斗中的HP（如果有记录）
     battlePet.maxHp = newPet.maxHp;
     battlePet.attack = newPet.atk;
     battlePet.defence = newPet.def;
@@ -245,48 +251,8 @@ export class BattleManager extends BaseManager {
       // 1. 先发送 2408 确认（空响应）
       await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_NPC_MONSTER));
 
-      // 获取玩家昵称
-      const playerNick = this.Player.Data.nick || `Player${this.UserID}`;
-
-      // 使用转换器构建精灵信息（链式调用）
-      // 发送玩家背包中所有精灵的信息，以便客户端切换精灵时能找到精灵数据
-      const playerPets = this.Player.PetManager.PetData.GetPetsInBag().map(pet => {
-        const petConfig = GameConfig.GetPetById(pet.petId);
-        const petType = petConfig?.Type || 0;
-        const skills = pet.skillArray.filter(s => s > 0);
-        const finalSkills = skills.length > 0 ? skills : [10001];
-        
-        // 获取技能PP
-        const skillsWithPP = finalSkills.map(skillId => {
-          const skillConfig = GameConfig.GetSkillById(skillId);
-          return {
-            id: skillId,
-            pp: skillConfig?.MaxPP || 20
-          };
-        });
-        
-        return new SimplePetInfoProto()
-          .setPetId(pet.petId)
-          .setLevel(pet.level)
-          .setHP(pet.hp, pet.maxHp)
-          .setSkills(skillsWithPP)
-          .setCatchTime(pet.catchTime)
-          .setCatchMap(301)
-          .setCatchLevel(pet.level)
-          .setSkinID(0);
-      });
-      
-      const enemyPets = [BattleConverter.ToSimplePetInfo(battle.enemy)];
-
       // 2. 然后发送 NOTE_READY_TO_FIGHT (2503)
-      await this.Player.SendPacket(new PacketNoteReadyToFight(
-        this.UserID,
-        playerNick,
-        playerPets,
-        0,
-        '野生精灵',  // 敌人昵称
-        enemyPets
-      ));
+      await this.SendReadyToFight(battle, '野生精灵');
       
       Logger.Info(`[BattleManager] 挑战野外精灵: UserID=${this.UserID}, Index=${monsterIndex}, PetId=${monsterId}, Level=${monsterLevel}`);
     } catch (error) {
@@ -298,83 +264,52 @@ export class BattleManager extends BaseManager {
   /**
    * 处理挑战BOSS
    * CMD 2411: CHALLENGE_BOSS
-   * 发送 NOTE_READY_TO_FIGHT (2503)
+   * 发送 2411 确认 + NOTE_READY_TO_FIGHT (2503)
+   * 
+   * @param bossId 客户端传来的BOSS ID
    */
   public async HandleChallengeBoss(bossId: number): Promise<void> {
-    // 清理旧战斗（如果存在）
-    if (this._currentBattle) {
-      Logger.Debug(`[BattleManager] 清理旧战斗: UserID=${this.UserID}`);
-      this._currentBattle = null;
-      this._currentBattleSlot = -1;
-      this._currentBattleMapId = -1;
-      this._battlePetHPMap.clear();
-    }
-
-    const bossLevel = 1;
-
-    const battle = await this._initService.CreatePVEBattle(this.UserID, bossId, bossLevel);
-    
-    if (!battle) {
-      // 检查是否是因为没有健康的精灵
-      const healthyPets = this.Player.PetManager.PetData.GetPetsInBag().filter(p => p.hp > 0);
-      if (healthyPets.length === 0) {
-        // 10017: 精灵体力不足（所有精灵阵亡）
-        await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(10017));
-        Logger.Warn(`[BattleManager] 玩家所有精灵已阵亡: UserID=${this.UserID}`);
-      } else {
-        // 其他原因导致创建失败
-        await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(5001));
-        Logger.Warn(`[BattleManager] 创建战斗失败: UserID=${this.UserID}`);
+    try {
+      // 清理旧战斗（如果存在）
+      if (this._currentBattle) {
+        Logger.Debug(`[BattleManager] 清理旧战斗: UserID=${this.UserID}`);
+        this._currentBattle = null;
+        this._currentBattleSlot = -1;
+        this._currentBattleMapId = -1;
+        this._battlePetHPMap.clear();
       }
-      return;
+
+      // 使用CreateBossBattle方法（通过bossId从配置读取完整BOSS信息）
+      const battle = await this._initService.CreateBossBattle(this.UserID, bossId);
+      
+      if (!battle) {
+        // 检查是否是因为没有健康的精灵
+        const healthyPets = this.Player.PetManager.PetData.GetPetsInBag().filter(p => p.hp > 0);
+        if (healthyPets.length === 0) {
+          // 10017: 精灵体力不足（所有精灵阵亡）
+          await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(10017));
+          Logger.Warn(`[BattleManager] 玩家所有精灵已阵亡: UserID=${this.UserID}`);
+        } else {
+          // 其他原因导致创建失败（可能是找不到BOSS配置）
+          await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(5001));
+          Logger.Warn(`[BattleManager] 创建BOSS战斗失败: UserID=${this.UserID}, BossId=${bossId}`);
+        }
+        return;
+      }
+
+      this._currentBattle = battle;
+
+      // 1. 先发送 2411 确认（空响应）
+      await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS));
+
+      // 2. 然后发送 NOTE_READY_TO_FIGHT (2503)
+      await this.SendReadyToFight(battle, 'BOSS');
+      
+      Logger.Info(`[BattleManager] 挑战BOSS: UserID=${this.UserID}, BossId=${bossId}, BattleBossId=${battle.bossId}`);
+    } catch (error) {
+      Logger.Error(`[BattleManager] HandleChallengeBoss failed`, error as Error);
+      await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(5000));
     }
-
-    this._currentBattle = battle;
-
-    // 获取玩家昵称
-    const playerNick = this.Player.Data.nick || `Player${this.UserID}`;
-
-    // 使用转换器构建精灵信息（链式调用）
-    // 发送玩家背包中所有精灵的信息，以便客户端切换精灵时能找到精灵数据
-    const playerPets = this.Player.PetManager.PetData.GetPetsInBag().map(pet => {
-      const petConfig = GameConfig.GetPetById(pet.petId);
-      const petType = petConfig?.Type || 0;
-      const skills = pet.skillArray.filter(s => s > 0);
-      const finalSkills = skills.length > 0 ? skills : [10001];
-      
-      // 获取技能PP
-      const skillsWithPP = finalSkills.map(skillId => {
-        const skillConfig = GameConfig.GetSkillById(skillId);
-        return {
-          id: skillId,
-          pp: skillConfig?.MaxPP || 20
-        };
-      });
-      
-      return new SimplePetInfoProto()
-        .setPetId(pet.petId)
-        .setLevel(pet.level)
-        .setHP(pet.hp, pet.maxHp)
-        .setSkills(skillsWithPP)
-        .setCatchTime(pet.catchTime)
-        .setCatchMap(301)
-        .setCatchLevel(pet.level)
-        .setSkinID(0);
-    });
-    
-    const enemyPets = [BattleConverter.ToSimplePetInfo(battle.enemy)];
-
-    // 发送 NOTE_READY_TO_FIGHT (2503)
-    await this.Player.SendPacket(new PacketNoteReadyToFight(
-      this.UserID,
-      playerNick,
-      playerPets,
-      0,
-      '',
-      enemyPets
-    ));
-    
-    Logger.Info(`[BattleManager] 挑战BOSS: UserID=${this.UserID}, BossId=${bossId}`);
   }
 
   /**
@@ -490,6 +425,13 @@ export class BattleManager extends BaseManager {
 
     // 4. 检查玩家精灵是否阵亡
     if (this._currentBattle.player.hp <= 0) {
+      // 同步当前精灵的HP（阵亡）
+      const currentPet = this.Player.PetManager.PetData.GetPetsInBag().find(p => p.catchTime === this._currentBattle!.player.catchTime);
+      if (currentPet) {
+        currentPet.hp = 0;
+        Logger.Info(`[BattleManager] 同步阵亡精灵HP: PetId=${currentPet.petId}, CatchTime=${currentPet.catchTime}`);
+      }
+      
       // 检查是否还有其他健康精灵
       const playerPets = this.Player.PetManager.PetData.GetPetsInBag();
       const currentCatchTime = this._currentBattle.player.catchTime;
@@ -711,14 +653,13 @@ export class BattleManager extends BaseManager {
         return;
       }
 
-      // 5. 更新战斗精灵数据
+      // 5. 更新战斗精灵数据（会从 _battlePetHPMap 读取战斗中的HP）
       this.UpdateBattlePet(this._currentBattle.player, newPet, petConfig);
 
-      // 记录切换前精灵的HP（如果被击杀，HP会是0）
-      // 注意：这里记录的是切换后的新精灵HP，旧精灵HP已经在战斗中更新了
-      this._battlePetHPMap.set(newPet.catchTime, newPet.hp);
+      // 6. 记录新精灵的当前HP到战斗HP映射（UpdateBattlePet已经设置了正确的HP）
+      this._battlePetHPMap.set(newPet.catchTime, this._currentBattle.player.hp);
 
-      // 6. 发送更换精灵响应
+      // 7. 发送更换精灵响应
       await this.Player.SendPacket(new PacketChangePet(
         this.UserID,
         newPet.petId,
@@ -732,10 +673,10 @@ export class BattleManager extends BaseManager {
       Logger.Info(
         `[BattleManager] 发送更换精灵响应: UserID=${this.UserID}, PetId=${newPet.petId}, ` +
         `Name=${newPet.nick || petConfig.DefName}, Level=${newPet.level}, ` +
-        `HP=${newPet.hp}/${newPet.maxHp}, CatchTime=${catchTime}`
+        `HP=${this._currentBattle.player.hp}/${this._currentBattle.player.maxHp}, CatchTime=${catchTime}`
       );
 
-      // 7. 更换精灵消耗玩家回合，敌人立即反击
+      // 8. 更换精灵消耗玩家回合，敌人立即反击
       const enemyAttackResult = this._turnService.ExecuteEnemyTurn(this._currentBattle);
       
       // 构建攻击结果
@@ -783,7 +724,7 @@ export class BattleManager extends BaseManager {
         this._currentBattle.enemy
       );
 
-      // 8. 发送 NOTE_USE_SKILL (2505) - 让客户端知道敌人反击了
+      // 9. 发送 NOTE_USE_SKILL (2505) - 让客户端知道敌人反击了
       await this.Player.SendPacket(new PacketNoteUseSkill(firstAttack, secondAttack));
 
       // 更新当前精灵的HP记录（敌人反击后）
@@ -792,11 +733,19 @@ export class BattleManager extends BaseManager {
         this._currentBattle.player.hp
       );
 
-      // 9. 检查战斗是否结束
+      // 10. 检查战斗是否结束
       // 如果玩家精灵阵亡，检查是否还有其他健康精灵
       if (this._currentBattle.player.hp <= 0) {
+        // 同步当前精灵的HP（阵亡）
+        const currentPet = this.Player.PetManager.PetData.GetPetsInBag().find(p => p.catchTime === this._currentBattle!.player.catchTime);
+        if (currentPet) {
+          currentPet.hp = 0;
+          Logger.Info(`[BattleManager] 同步阵亡精灵HP: PetId=${currentPet.petId}, CatchTime=${currentPet.catchTime}`);
+        }
+        
+        // 检查是否还有其他健康精灵
         const playerPets = this.Player.PetManager.PetData.GetPetsInBag();
-        const hasHealthyPet = playerPets.some(p => p.hp > 0);
+        const hasHealthyPet = playerPets.some(p => p.hp > 0 && p.catchTime !== this._currentBattle!.player.catchTime);
         
         if (!hasHealthyPet) {
           // 没有健康精灵，战斗失败
@@ -806,6 +755,7 @@ export class BattleManager extends BaseManager {
         } else {
           // 还有健康精灵，客户端会自动弹出精灵选择面板
           Logger.Info(`[BattleManager] 更换精灵后当前精灵阵亡，等待玩家选择下一只精灵`);
+          // 不发送 FIGHT_OVER，等待客户端发送下一个 CHANGE_PET
         }
       }
 
@@ -969,6 +919,9 @@ export class BattleManager extends BaseManager {
     // 逃跑总是成功（没有失败的设定）
     Logger.Info(`[BattleManager] 逃跑成功: UserID=${this.UserID}`);
     
+    // 同步战斗中的精灵HP（逃跑也要保存HP变化）
+    await this.SyncBattlePetHP();
+    
     // 1. 发送逃跑成功响应
     await this.Player.SendPacket(new PacketEscapeFight(1));
     
@@ -1008,5 +961,57 @@ export class BattleManager extends BaseManager {
       this._currentBattle = null;
       this._currentBattleSlot = -1;
     }
+  }
+
+  // ==================== 私有辅助方法 ====================
+
+  /**
+   * 构建玩家背包中所有精灵的SimplePetInfoProto数组
+   * 用于发送 NOTE_READY_TO_FIGHT 时包含完整精灵信息
+   */
+  private BuildPlayerPetsInfo(): SimplePetInfoProto[] {
+    return this.Player.PetManager.PetData.GetPetsInBag().map(pet => {
+      const petConfig = GameConfig.GetPetById(pet.petId);
+      const skills = pet.skillArray.filter(s => s > 0);
+      const finalSkills = skills.length > 0 ? skills : [10001];
+      
+      // 获取技能PP
+      const skillsWithPP = finalSkills.map(skillId => {
+        const skillConfig = GameConfig.GetSkillById(skillId);
+        return {
+          id: skillId,
+          pp: skillConfig?.MaxPP || 20
+        };
+      });
+      
+      return new SimplePetInfoProto()
+        .setPetId(pet.petId)
+        .setLevel(pet.level)
+        .setHP(pet.hp, pet.maxHp)
+        .setSkills(skillsWithPP)
+        .setCatchTime(pet.catchTime)
+        .setCatchMap(301)
+        .setCatchLevel(pet.level)
+        .setSkinID(0);
+    });
+  }
+
+  /**
+   * 发送战斗准备通知 (NOTE_READY_TO_FIGHT)
+   * 用于通知客户端战斗即将开始
+   */
+  private async SendReadyToFight(battle: IBattleInfo, enemyNickname: string = ''): Promise<void> {
+    const playerNick = this.Player.Data.nick || `Player${this.UserID}`;
+    const playerPets = this.BuildPlayerPetsInfo();
+    const enemyPets = [BattleConverter.ToSimplePetInfo(battle.enemy)];
+
+    await this.Player.SendPacket(new PacketNoteReadyToFight(
+      this.UserID,
+      playerNick,
+      playerPets,
+      0,
+      enemyNickname,
+      enemyPets
+    ));
   }
 }

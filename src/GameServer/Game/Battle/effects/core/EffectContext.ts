@@ -71,7 +71,22 @@ export enum EffectTiming {
   ON_RECEIVE_DAMAGE = 'ON_RECEIVE_DAMAGE',
   
   // 闪避时
-  ON_EVADE = 'ON_EVADE'
+  ON_EVADE = 'ON_EVADE',
+
+  // 出手流程开始（每个攻击方出手前，异常扣血在此）
+  ATTACK_START = 'ATTACK_START',
+
+  // 命中时（命中判定通过后，技能效果结算前。需命中才触发）
+  ON_HIT = 'ON_HIT',
+
+  // 即时技能效果结算（命中后，伤害计算前。大部分技能副作用在此）
+  SKILL_EFFECT = 'SKILL_EFFECT',
+
+  // 出手流程结束时（单次攻击所有伤害结算完毕后）
+  ATTACK_END = 'ATTACK_END',
+
+  // 出手流程结束后（双方攻击都完成后，击杀控等）
+  AFTER_ATTACK_END = 'AFTER_ATTACK_END'
 }
 
 /**

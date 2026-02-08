@@ -13,6 +13,7 @@
 import { Logger } from '../../../../shared/utils';
 import { IBattlePet } from '../../../../shared/models/BattleModel';
 import { PassiveEffectRunner } from '../PassiveEffectRunner';
+import { IAbilityEntry } from './BossAbilityConfig';
 
 /**
  * BOSS特性管理器
@@ -23,15 +24,15 @@ export class BossAbilityManager {
    * 为BOSS初始化特性（战斗开始时调用）
    *
    * @param boss BOSS精灵
-   * @param abilityIds 特性ID列表
+   * @param abilityEntries 特性条目列表（含参数）
    */
-  public static InitializeBossAbilities(boss: IBattlePet, abilityIds: number[]): void {
+  public static InitializeBossAbilities(boss: IBattlePet, abilityEntries: IAbilityEntry[]): void {
     Logger.Info(
       `[BossAbilityManager] 初始化BOSS特性: ${boss.name}, ` +
-      `特性数=${abilityIds.length}, ID=[${abilityIds.join(', ')}]`
+      `特性数=${abilityEntries.length}, ID=[${abilityEntries.map(e => e.id).join(', ')}]`
     );
 
-    PassiveEffectRunner.RegisterPassives(boss, abilityIds);
+    PassiveEffectRunner.RegisterPassives(boss, abilityEntries);
   }
 
   /**

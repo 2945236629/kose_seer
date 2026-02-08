@@ -5,6 +5,21 @@ import { Logger } from './shared/utils';
 import { Config } from './shared/config';
 import { ConfigRegistry } from './shared/config/ConfigRegistry';
 import { GetGameConfigRegistrations } from './shared/config/ConfigDefinitions';
+import { CommandManager } from './shared/command';
+import {
+  HelpCommand,
+  PlayerCommand,
+  GiveCommand,
+  ReloadCommand,
+  ClearCommand,
+  ExitCommand,
+  StatusCommand,
+  ConfigCommand,
+  MemoryCommand,
+  UptimeCommand,
+  GCCommand,
+  AnnounceCommand
+} from './shared/command/commands';
 
 // 初始化日志系统
 Logger.Initialize(Config.Logging.level);
@@ -120,7 +135,7 @@ class ServiceManager {
         // 注册并加载游戏配置
         ConfigRegistry.Instance.RegisterBatch(GetGameConfigRegistrations());
         await ConfigRegistry.Instance.Initialize();
-        Logger.Info('[Startup] 游戏配置已加载');
+        Logger.Info('[Startup] 游戏配置已成功全部加载');
         
         this._gameServer = new GameServer();
         await this._gameServer.Start();
@@ -227,6 +242,17 @@ class ServiceManager {
       proxy: this._proxyServer?.IsRunning ?? false,
     };
   }
+
+  /**
+   * 获取服务器实例（用于控制台命令）
+   */
+  public GetServers() {
+    return {
+      game: this._gameServer,
+      gm: this._gmServer,
+      proxy: this._proxyServer
+    };
+  }
 }
 
 // 解析命令行参数
@@ -240,7 +266,40 @@ if (options.help) {
 
 // 创建服务管理器并启动
 const serviceManager = new ServiceManager();
-serviceManager.Start(options).catch((err: Error) => {
+
+// 创建命令管理器
+const commandManager = CommandManager.getInstance();
+
+// 注册所有命令
+commandManager.registerCommands([
+  // 系统命令
+  HelpCommand,
+  ClearCommand,
+  ExitCommand,
+  
+  // 服务器管理命令
+  StatusCommand,
+  ConfigCommand,
+  MemoryCommand,
+  UptimeCommand,
+  GCCommand,
+  ReloadCommand,
+  AnnounceCommand,
+  
+  // GM 命令（只在游戏服务器启动时注册）
+  ...(options.all || options.game ? [
+    PlayerCommand,
+    GiveCommand
+  ] : [])
+]);
+
+// 启动服务
+serviceManager.Start(options).then(() => {
+  // 服务启动成功后，启动控制台
+  if (process.stdin.isTTY) {
+    commandManager.start();
+  }
+}).catch((err: Error) => {
   Logger.Error('启动服务失败', err instanceof Error ? err : new Error(String(err)));
   process.exit(1);
 });
@@ -256,6 +315,12 @@ async function gracefulShutdown(signal: string) {
     
     if (forceExitCount >= 2) {
       Logger.Warn('强制退出');
+      
+      // 清理命令管理器
+      if (commandManager) {
+        commandManager.stop();
+      }
+      
       process.exit(1);
     } else {
       Logger.Warn('正在关闭中，请稍候... (再次按 Ctrl+C 强制退出)');
@@ -265,6 +330,11 @@ async function gracefulShutdown(signal: string) {
   
   isShuttingDown = true;
   Logger.Info(`收到 ${signal} 信号，正在关闭服务...`);
+  
+  // 先关闭命令管理器，防止阻止退出
+  if (commandManager) {
+    commandManager.stop();
+  }
   
   // 设置超时，10秒后强制退出
   shutdownTimeout = setTimeout(() => {
@@ -311,26 +381,7 @@ process.on('SIGTERM', () => {
   gracefulShutdown('SIGTERM');
 });
 
-// Windows 特殊处理 - 使用 readline 捕获 Ctrl+C
-if (process.platform === 'win32') {
-  const readline = require('readline');
-  if (process.stdin.isTTY) {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    rl.on('SIGINT', () => {
-      // Windows 下 readline 的 SIGINT 事件
-      process.emit('SIGINT' as any);
-    });
-    
-    // 防止 readline 阻止进程退出
-    rl.on('close', () => {
-      // 不做任何事，让进程正常退出
-    });
-  }
-}
+// Windows 特殊处理已由 ConsoleCommands 处理，这里不再需要
 
 // 处理未捕获的异常
 process.on('uncaughtException', (err) => {

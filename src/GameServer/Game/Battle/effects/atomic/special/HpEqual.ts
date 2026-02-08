@@ -1,6 +1,7 @@
 import { BaseAtomicEffect } from '../core/BaseAtomicEffect';
 import { IEffectContext, IEffectResult } from '../../core/EffectContext';
 import { AtomicEffectType } from '../core/IAtomicEffect';
+import { BossRules } from '../../../BossRules';
 
 /**
  * 同生共死参数接口
@@ -69,6 +70,12 @@ export class HpEqual extends BaseAtomicEffect {
 
   public execute(context: IEffectContext): IEffectResult[] {
     const { attacker, defender } = context;
+
+    // 同生共死免疫检查
+    if (this.mode === 'equal_to_self' && BossRules.IsSameLifeDeathImmune(defender.petId)) {
+      return [this.createResult(false, 'both', 'hp_equal', '同生共死被免疫', 0)];
+    }
+
     const oldAttackerHp = attacker.hp;
     const oldDefenderHp = defender.hp;
 

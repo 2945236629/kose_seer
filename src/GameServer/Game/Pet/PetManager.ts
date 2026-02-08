@@ -181,16 +181,48 @@ export class PetManager extends BaseManager {
 
   /**
    * 处理设置首发精灵
+   * 
+   * 优化：设置首发时直接调整数组顺序，确保首发精灵在第一位
+   * 这样登录和其他地方就不需要额外排序了
    */
   public async HandlePetDefault(catchTime: number): Promise<void> {
     const pet = this.PetData.GetPetByCatchTime(catchTime);
     
     if (pet && pet.isInBag) {
-      // 清除其他精灵的首发标记
+      // 1. 清除其他精灵的首发标记
       this.PetData.PetList.forEach(p => p.isDefault = false);
-      // 设置当前精灵为首发
+      
+      // 2. 设置当前精灵为首发
       pet.isDefault = true;
-      // BaseData 自动保存，无需手动调用
+      
+      // 3. 调整数组顺序：将首发精灵移到背包精灵的第一位
+      // 找到所有背包精灵的索引
+      const bagIndices: number[] = [];
+      this.PetData.PetList.forEach((p, index) => {
+        if (p.isInBag) {
+          bagIndices.push(index);
+        }
+      });
+      
+      // 找到首发精灵在数组中的位置
+      const defaultPetIndex = this.PetData.PetList.findIndex(p => p.catchTime === catchTime);
+      
+      if (defaultPetIndex !== -1 && bagIndices.length > 0) {
+        // 如果首发精灵不在第一个背包位置，则移动它
+        const firstBagIndex = bagIndices[0];
+        if (defaultPetIndex !== firstBagIndex) {
+          // 从原位置移除
+          const [defaultPet] = this.PetData.PetList.splice(defaultPetIndex, 1);
+          // 插入到第一个背包位置
+          this.PetData.PetList.splice(firstBagIndex, 0, defaultPet);
+          
+          Logger.Debug(
+            `[PetManager] 调整精灵顺序: PetId=${pet.petId} 从索引${defaultPetIndex}移到${firstBagIndex}`
+          );
+        }
+      }
+      
+      // BaseData 自动保存（包括数组顺序的变化）
       
       await this.Player.SendPacket(new PacketPetDefault());
       Logger.Info(`[PetManager] 设置首发精灵: UserID=${this.UserID}, PetId=${pet.petId}, CatchTime=${catchTime}`);
@@ -465,8 +497,23 @@ export class PetManager extends BaseManager {
     proto.catchMap = 0;
     proto.catchRect = 0;
     proto.catchLevel = pet.obtainLevel;
-    proto.effects = [];
+    // 特性列表
+    proto.effects = (pet.effectList || []).map(e => {
+      const args = (e.args || '').split(' ').map(Number);
+      const effect = {
+        itemId: e.itemId || 0,
+        status: e.status || 2,
+        leftCount: e.leftCount === -1 ? 255 : (e.leftCount || 0),
+        effectID: e.effectID || 0,
+        arg1: args[0] || 0,
+        arg2: args[1] || 0
+      };
+      Logger.Debug(`[PetManager] 构建特性: effectID=${effect.effectID}, itemId=${effect.itemId}, status=${effect.status}, leftCount=${effect.leftCount}, arg1=${effect.arg1}, arg2=${effect.arg2}`);
+      return effect;
+    });
     proto.skinID = 0;
+    
+    Logger.Debug(`[PetManager] 精灵 ${pet.petId} 特性数量: ${proto.effects.length}`);
     
     return proto;
   }

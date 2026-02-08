@@ -29,6 +29,7 @@ export const ConfigKeys = {
   ELEMENTS_CONFIG: 'elements_config',
   UNIQUE_ITEMS_CONFIG: 'unique_items_config',
   SKILL_EFFECTS_V2: 'skill_effects_v2',
+  PET_ABILITIES: 'pet_abilities',
 } as const;
 
 /**
@@ -57,6 +58,7 @@ export const ConfigPaths: Record<string, string> = {
   [ConfigKeys.ELEMENTS_CONFIG]: 'data/json/elements.json',
   [ConfigKeys.UNIQUE_ITEMS_CONFIG]: 'data/json/unique-items.json',
   [ConfigKeys.SKILL_EFFECTS_V2]: 'data/json/skill_effects_v2.json',
+  [ConfigKeys.PET_ABILITIES]: 'data/json/pet_abilities.json',
 };
 
 /**
@@ -89,6 +91,7 @@ export const ConfigTypes: Record<string, ConfigType> = {
   [ConfigKeys.ELEMENTS_CONFIG]: ConfigType.JSON,
   [ConfigKeys.UNIQUE_ITEMS_CONFIG]: ConfigType.JSON,
   [ConfigKeys.SKILL_EFFECTS_V2]: ConfigType.JSON,
+  [ConfigKeys.PET_ABILITIES]: ConfigType.JSON,
 };
 
 /**
@@ -108,7 +111,8 @@ export function GetGameConfigRegistrations(): Array<{ key: string; path: string;
     { key: ConfigKeys.NATURES_CONFIG, path: ConfigPaths[ConfigKeys.NATURES_CONFIG], type: ConfigTypes[ConfigKeys.NATURES_CONFIG] },
     { key: ConfigKeys.ELEMENTS_CONFIG, path: ConfigPaths[ConfigKeys.ELEMENTS_CONFIG], type: ConfigTypes[ConfigKeys.ELEMENTS_CONFIG] },
     { key: ConfigKeys.UNIQUE_ITEMS_CONFIG, path: ConfigPaths[ConfigKeys.UNIQUE_ITEMS_CONFIG], type: ConfigTypes[ConfigKeys.UNIQUE_ITEMS_CONFIG] },
-    { key: ConfigKeys.SKILL_EFFECTS_V2, path: ConfigPaths[ConfigKeys.SKILL_EFFECTS_V2], type: ConfigTypes[ConfigKeys.SKILL_EFFECTS_V2] }
+    { key: ConfigKeys.SKILL_EFFECTS_V2, path: ConfigPaths[ConfigKeys.SKILL_EFFECTS_V2], type: ConfigTypes[ConfigKeys.SKILL_EFFECTS_V2] },
+    { key: ConfigKeys.PET_ABILITIES, path: ConfigPaths[ConfigKeys.PET_ABILITIES], type: ConfigTypes[ConfigKeys.PET_ABILITIES] }
     //{ key: ConfigKeys.BATTLE_CONFIG, path: ConfigPaths[ConfigKeys.BATTLE_CONFIG], type: ConfigTypes[ConfigKeys.BATTLE_CONFIG] },
   ];
 }

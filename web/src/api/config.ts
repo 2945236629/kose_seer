@@ -80,6 +80,13 @@ export const configApi = {
     }))
   },
 
+  // 搜索特性选项（分页）
+  searchAbilities(query: string = '', page: number = 1, pageSize: number = 50) {
+    return extractData(request.get('/api/config/search/abilities', {
+      params: { query, page, pageSize }
+    }))
+  },
+
   // 获取性格列表
   getNatures() {
     return extractData(request.get('/api/config/natures'))

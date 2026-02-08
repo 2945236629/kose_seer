@@ -71,7 +71,7 @@ export class ConfigLoader {
       // 缓存配置
       this._configCache.set(relativePath, config);
 
-      Logger.Info(`[ConfigLoader] 加载配置: ${relativePath}`);
+      Logger.Info(`[ConfigLoader] 准备加载配置: ${relativePath}`);
       return config;
     } catch (error) {
       Logger.Error(`[ConfigLoader] 加载配置失败: ${relativePath}`, error as Error);

@@ -513,6 +513,33 @@ export class GameConfig {
   }
 
   /**
+   * 获取精灵特性配置
+   */
+  public static GetPetAbilitiesConfig(): any | null {
+    return ConfigRegistry.Instance.Get<any>(ConfigKeys.PET_ABILITIES);
+  }
+
+  /**
+   * 获取所有精灵可拥有的特性列表
+   */
+  public static GetAllPetAbilities(): any[] {
+    const config = this.GetPetAbilitiesConfig();
+    if (!config || !config.abilities) {
+      return [];
+    }
+    return config.abilities;
+  }
+
+  /**
+   * 获取指定特性配置
+   * @param abilityId 特性ID（客户端ID，如1006-1045）
+   */
+  public static GetPetAbilityById(abilityId: number): any | null {
+    const abilities = this.GetAllPetAbilities();
+    return abilities.find((a: any) => a.abilityId === abilityId) || null;
+  }
+
+  /**
    * 获取指定商品的配置
    * @param productId 商品ID
    */

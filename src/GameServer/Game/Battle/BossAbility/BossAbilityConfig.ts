@@ -1,7 +1,12 @@
 /**
- * BOSS特性配置加载器
+ * BOSS配置加载器
+ *
+ * 从 boss_abilities.json 读取BOSS完整配置
+ * 包含：属性、等级、掉落、特性等
  * 
- * 从 boss_abilities.json 读取BOSS特性配置
+ * 特性支持两种格式:
+ *   纯数字: 1902 → 使用默认参数
+ *   带参数: { "id": 1904, "args": [30] } → 覆盖默认参数
  */
 
 import * as fs from 'fs';
@@ -9,32 +14,52 @@ import * as path from 'path';
 import { Logger } from '../../../../shared/utils';
 
 /**
- * BOSS特性配置接口
+ * 单个特性条目（解析后）
  */
-export interface IBossAbilityConfig {
+export interface IAbilityEntry {
+  id: number;
+  args?: number[];
+}
+
+/**
+ * BOSS完整配置接口（JSON原始格式）
+ */
+export interface IBossConfig {
+  bossId: number;
   petId: number;
   petName: string;
-  abilities: number[];
+  clientId: number;
+  level: number;
+  dv: number;
+  ev: number;
+  nature: number;
+  customHP?: number;  // 自定义血量（可选）
+  abilities: (number | { id: number; args?: number[] })[];
+  drops: Array<{ itemId: number; rate: number; count: number }>;
+  rewards: { exp: number; coins: number };
   description: string;
 }
 
 /**
- * BOSS特性配置文件接口
+ * BOSS配置文件接口
  */
-interface IBossAbilityConfigFile {
+interface IBossConfigFile {
   version: string;
   description: string;
   lastUpdate: string;
-  bossAbilities: IBossAbilityConfig[];
+  bossConfigs: IBossConfig[];
+  abilityReference?: any;
+  dropItemReference?: any;
   notes?: string[];
 }
 
 /**
- * BOSS特性配置类
+ * BOSS配置类
  */
 export class BossAbilityConfig {
   private static _instance: BossAbilityConfig;
-  private configMap: Map<number, number[]> = new Map();
+  private abilityMap: Map<number, IAbilityEntry[]> = new Map(); // petId -> abilities
+  private bossConfigMap: Map<number, IBossConfig> = new Map(); // bossId -> config
   private loaded: boolean = false;
 
   private constructor() {}
@@ -70,17 +95,33 @@ export class BossAbilityConfig {
       }
 
       const content = fs.readFileSync(configPath, 'utf-8');
-      const config: IBossAbilityConfigFile = JSON.parse(content);
+      const config: IBossConfigFile = JSON.parse(content);
 
       // 构建映射表
-      this.configMap.clear();
-      for (const boss of config.bossAbilities) {
-        this.configMap.set(boss.petId, boss.abilities);
+      this.abilityMap.clear();
+      this.bossConfigMap.clear();
+      
+      for (const boss of config.bossConfigs) {
+        // 解析特性列表
+        const entries: IAbilityEntry[] = [];
+        for (const ability of boss.abilities) {
+          if (typeof ability === 'number') {
+            entries.push({ id: ability });
+          } else {
+            entries.push({ id: ability.id, args: ability.args });
+          }
+        }
+        
+        // 存储特性映射（按petId索引，向后兼容）
+        this.abilityMap.set(boss.petId, entries);
+        
+        // 存储完整配置（按bossId索引）
+        this.bossConfigMap.set(boss.bossId, boss);
       }
 
       Logger.Info(
-        `[BossAbilityConfig] 加载BOSS特性配置成功: ` +
-        `版本=${config.version}, BOSS数=${config.bossAbilities.length}`
+        `[BossAbilityConfig] 加载BOSS配置成功: ` +
+        `版本=${config.version}, BOSS数=${config.bossConfigs.length}`
       );
 
       this.loaded = true;
@@ -91,22 +132,68 @@ export class BossAbilityConfig {
   }
 
   /**
-   * 获取精灵的特性ID列表
-   * 
-   * @param petId 精灵ID
-   * @returns 特性ID数组
+   * 根据bossId获取BOSS完整配置
+   *
+   * @param bossId BOSS唯一ID
+   * @returns BOSS配置对象，如果不存在返回undefined
    */
-  public GetAbilities(petId: number): number[] {
+  public GetBossConfig(bossId: number): IBossConfig | undefined {
     if (!this.loaded) {
       this.Load();
     }
 
-    return this.configMap.get(petId) || [];
+    return this.bossConfigMap.get(bossId);
+  }
+
+  /**
+   * 根据clientId获取BOSS完整配置
+   * 客户端传来的是精灵显示ID（clientId），需要通过它查找BOSS配置
+   *
+   * @param clientId 客户端精灵ID
+   * @returns BOSS配置对象，如果不存在返回undefined
+   */
+  public GetBossConfigByClientId(clientId: number): IBossConfig | undefined {
+    if (!this.loaded) {
+      this.Load();
+    }
+
+    // 遍历所有BOSS配置，查找匹配的clientId
+    for (const boss of this.bossConfigMap.values()) {
+      if (boss.clientId === clientId) {
+        return boss;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * 获取精灵的特性条目列表（包含参数）
+   *
+   * @param petId 精灵ID
+   * @returns 特性条目数组
+   */
+  public GetAbilityEntries(petId: number): IAbilityEntry[] {
+    if (!this.loaded) {
+      this.Load();
+    }
+
+    return this.abilityMap.get(petId) || [];
+  }
+
+  /**
+   * 获取精灵的特性ID列表（向后兼容）
+   *
+   * @param petId 精灵ID
+   * @returns 特性ID数组
+   */
+  public GetAbilities(petId: number): number[] {
+    return this.GetAbilityEntries(petId).map(e => e.id);
   }
 
   /**
    * 检查精灵是否有特性
-   * 
+   *
    * @param petId 精灵ID
    * @returns 是否有特性
    */
@@ -115,7 +202,21 @@ export class BossAbilityConfig {
       this.Load();
     }
 
-    return this.configMap.has(petId);
+    return this.abilityMap.has(petId);
+  }
+
+  /**
+   * 检查BOSS是否存在
+   *
+   * @param bossId BOSS唯一ID
+   * @returns 是否存在
+   */
+  public HasBoss(bossId: number): boolean {
+    if (!this.loaded) {
+      this.Load();
+    }
+
+    return this.bossConfigMap.has(bossId);
   }
 
   /**
@@ -123,7 +224,8 @@ export class BossAbilityConfig {
    */
   public Reload(): void {
     this.loaded = false;
-    this.configMap.clear();
+    this.abilityMap.clear();
+    this.bossConfigMap.clear();
     this.Load();
   }
 }

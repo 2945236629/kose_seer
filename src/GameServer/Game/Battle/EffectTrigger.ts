@@ -21,6 +21,7 @@ import { EffectTiming, createEffectContext, IEffectResult } from './effects/core
 import { SkillEffectsConfig } from '../../../shared/config/game/SkillEffectsConfig';
 import { AtomicEffectFactory } from './effects/atomic/core/AtomicEffectFactory';
 import { IAtomicEffectParams } from './effects/atomic/core/IAtomicEffect';
+import { BossRules } from './BossRules';
 
 /**
  * 效果触发器类
@@ -46,13 +47,12 @@ export class EffectTrigger {
   ): IEffectResult[] {
     // 如果技能没有附加效果，直接返回
     if (!skill.sideEffect || skill.sideEffect === 0) {
-      Logger.Debug(`[EffectTrigger] 技能无副作用: ${skill.name} (ID=${skill.id})`);
       return [];
     }
 
-    Logger.Debug(
-      `[EffectTrigger] 触发技能效果: ${skill.name} (ID=${skill.id}), ` +
-      `副作用=${skill.sideEffect}, 时机=${timing}`
+    // 只在INFO级别显示技能效果触发
+    Logger.Info(
+      `[技能效果] ${skill.name} 触发效果 (时机=${timing})`
     );
 
     // 检查是否为多效果技能
@@ -492,7 +492,11 @@ export class EffectTrigger {
           break;
 
         case 'hp_equal':
-          // 同生共死
+          // 同生共死 - 检查免疫
+          if (BossRules.IsSameLifeDeathImmune(defender.petId)) {
+            Logger.Info(`[效果应用] 同生共死被免疫: ${defender.name} (petId=${defender.petId})`);
+            break;
+          }
           defender.hp = attacker.hp;
           Logger.Info(`[效果应用] 同生共死: 对方HP变为 ${defender.hp}`);
           break;

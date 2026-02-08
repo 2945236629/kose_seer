@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { apiRouter } from './routes';
 import { Logger } from '../shared/utils/Logger';
 import { ServerConfig } from '../shared/config/ServerConfig';
@@ -55,10 +57,22 @@ export class GMServer {
    * 配置路由
    */
   private setupRoutes(): void {
+    // Web GM 静态文件服务
+    const webGmPath = (process as any).pkg
+      ? path.join(path.dirname(process.execPath), 'web-gm')
+      : path.join(__dirname, '../../web/dist');
+
+    if (fs.existsSync(webGmPath)) {
+      this.app.use(express.static(webGmPath));
+      //Logger.Info(`[GMServer] Web GM 静态文件: ${webGmPath}`);
+    } else {
+      Logger.Warn(`[GMServer] Web GM 目录不存在: ${webGmPath}，跳过静态文件服务`);
+    }
+
     // 健康检查
     this.app.get('/health', (req, res) => {
-      res.json({ 
-        status: 'ok', 
+      res.json({
+        status: 'ok',
         service: 'gm-server',
         version: '2.0.0',
         timestamp: Date.now()
@@ -68,13 +82,27 @@ export class GMServer {
     // API 路由（模块化）
     this.app.use('/api', apiRouter);
 
-    // 404 处理
-    this.app.use((req, res) => {
-      res.status(404).json({
-        success: false,
-        error: 'API 不存在',
-        path: req.path
-      });
+    // SPA fallback: 非 /api 请求返回 index.html
+    this.app.use((req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        res.status(404).json({
+          success: false,
+          error: 'API 不存在',
+          path: req.path
+        });
+        return;
+      }
+
+      const indexPath = path.join(webGmPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({
+          success: false,
+          error: 'Web GM 未部署',
+          path: req.path
+        });
+      }
     });
 
     // 错误处理
@@ -94,9 +122,9 @@ export class GMServer {
     this.app.listen(this.port, () => {
       Logger.Info(`[GMServer] ========================================`);
       Logger.Info(`[GMServer] GM 服务器启动成功`);
-      Logger.Info(`[GMServer] 地址: http://localhost:${this.port}`);
-      Logger.Info(`[GMServer] API 文档: http://localhost:${this.port}/api/docs`);
-      Logger.Info(`[GMServer] 健康检查: http://localhost:${this.port}/health`);
+      Logger.Info(`[GMServer] API 地址: http://localhost:${this.port}`);
+      // Logger.Info(`[GMServer] API 文档: http://localhost:${this.port}/api/docs`);
+      // Logger.Info(`[GMServer] 健康检查: http://localhost:${this.port}/health`);
       Logger.Info(`[GMServer] ========================================`);
     });
   }

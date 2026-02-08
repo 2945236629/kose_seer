@@ -58,8 +58,8 @@ export class PriorityModifier extends BaseAtomicEffect {
         break;
     }
 
-    // 限制优先级范围 -7 到 +7
-    newPriority = Math.max(-7, Math.min(7, newPriority));
+    // 限制优先级范围 -128 到 +127
+    newPriority = Math.max(-128, Math.min(127, newPriority));
     context.skill.priority = newPriority;
 
     results.push(

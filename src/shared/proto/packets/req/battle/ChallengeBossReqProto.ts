@@ -1,24 +1,32 @@
 import { BaseProto } from '../../../base/BaseProto';
+import { CommandID } from '../../../../protocol/CommandID';
 
 /**
  * [CMD: 2411 CHALLENGE_BOSS] 挑战BOSS请求
  */
 export class ChallengeBossReqProto extends BaseProto {
-  bossId: number = 0;  // BOSS ID
+  public bossId: number = 0;
 
   constructor() {
-    super(0);
+    super(CommandID.CHALLENGE_BOSS);
   }
 
-  serialize(): Buffer {
-    return Buffer.alloc(0);
+  public deserialize(buffer: Buffer): void {
+    let offset = 0;
+    
+    // 读取 bossId (uint32)
+    this.bossId = buffer.readUInt32BE(offset);
+    offset += 4;
   }
 
-  static fromBuffer(buffer: Buffer): ChallengeBossReqProto {
-    const proto = new ChallengeBossReqProto();
-    if (buffer.length >= 4) {
-      proto.bossId = buffer.readUInt32BE(0);
-    }
-    return proto;
+  public serialize(): Buffer {
+    const buffer = Buffer.alloc(4);
+    let offset = 0;
+    
+    // 写入 bossId (uint32)
+    buffer.writeUInt32BE(this.bossId, offset);
+    offset += 4;
+    
+    return buffer;
   }
 }

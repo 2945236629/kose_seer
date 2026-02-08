@@ -292,7 +292,9 @@ export class PlayerService {
           dvSpeed: pet.dvSpeed,
           nature: pet.nature,
           exp: pet.exp,
-          skillArray: skillArray
+          skillArray: skillArray,
+          effectList: pet.effectList || [],
+          effectCount: pet.effectCount || 0
         };
       }) || [],
       

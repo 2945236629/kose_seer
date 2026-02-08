@@ -8,6 +8,7 @@ import { serverRouter } from './server';
 import { logRouter } from './log';
 import { configRouter } from './config';
 import { reloadRouter } from './reload';
+import { abilityRouter } from './ability';
 import { authMiddleware, whitelistMiddleware } from '../middleware/auth';
 
 export const apiRouter = Router();
@@ -26,6 +27,9 @@ apiRouter.use('/items', itemRouter);
 
 // 精灵管理
 apiRouter.use('/pets', petRouter);
+
+// 精灵特性管理
+apiRouter.use('/abilities', abilityRouter);
 
 // 货币管理
 apiRouter.use('/currency', currencyRouter);
@@ -117,6 +121,15 @@ apiRouter.get('/docs', (req, res) => {
           'POST /api/reload/:type': '重载指定配置',
           'POST /api/reload': '重载所有配置',
           'GET /api/reload/status': '配置状态'
+        }
+      },
+      abilities: {
+        description: '精灵特性管理',
+        endpoints: {
+          'GET /api/abilities': '获取所有可用特性列表',
+          'GET /api/abilities/:uid/:catchTime': '获取指定精灵的特性',
+          'POST /api/abilities/:uid': '设置精灵特性',
+          'DELETE /api/abilities/:uid': '清除精灵特性'
         }
       }
     }

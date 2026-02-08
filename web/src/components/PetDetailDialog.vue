@@ -198,11 +198,10 @@
         <el-descriptions :column="3" border size="small">
           <el-descriptions-item label="HP">
             <span v-if="!isEditing">{{ pet.evHp || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evHp" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evHp"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -210,11 +209,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="攻击">
             <span v-if="!isEditing">{{ pet.evAtk || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evAtk" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evAtk"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -222,11 +220,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="防御">
             <span v-if="!isEditing">{{ pet.evDef || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evDef" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evDef"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -234,11 +231,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="特攻">
             <span v-if="!isEditing">{{ pet.evSpAtk || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evSpAtk" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evSpAtk"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -246,11 +242,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="特防">
             <span v-if="!isEditing">{{ pet.evSpDef || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evSpDef" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evSpDef"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -258,11 +253,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="速度">
             <span v-if="!isEditing">{{ pet.evSpeed || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.evSpeed" 
-              :min="0" 
-              :max="255"
+              v-model="editForm.evSpeed"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -282,11 +276,10 @@
         <el-descriptions :column="3" border size="small">
           <el-descriptions-item label="HP">
             <span v-if="!isEditing">{{ pet.dvHp || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvHp" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvHp"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -294,11 +287,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="攻击">
             <span v-if="!isEditing">{{ pet.dvAtk || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvAtk" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvAtk"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -306,11 +298,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="防御">
             <span v-if="!isEditing">{{ pet.dvDef || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvDef" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvDef"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -318,11 +309,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="特攻">
             <span v-if="!isEditing">{{ pet.dvSpAtk || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvSpAtk" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvSpAtk"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -330,11 +320,10 @@
           </el-descriptions-item>
           <el-descriptions-item label="特防">
             <span v-if="!isEditing">{{ pet.dvSpDef || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvSpDef" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvSpDef"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -342,17 +331,55 @@
           </el-descriptions-item>
           <el-descriptions-item label="速度">
             <span v-if="!isEditing">{{ pet.dvSpeed || 0 }}</span>
-            <el-input-number 
+            <el-input-number
               v-else
-              v-model="editForm.dvSpeed" 
-              :min="0" 
-              :max="31"
+              v-model="editForm.dvSpeed"
+              :min="0"
               size="small"
               controls-position="right"
               style="width: 100%"
             />
           </el-descriptions-item>
         </el-descriptions>
+      </el-card>
+
+      <!-- 特性 -->
+      <el-card class="detail-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <el-icon><Aim /></el-icon>
+            <span>特性</span>
+          </div>
+        </template>
+
+        <!-- 查看模式 -->
+        <div v-if="!isEditing">
+          <div v-if="currentAbilityId > 0" class="skill-list">
+            <div class="skill-item">
+              <div class="skill-info">
+                <span class="skill-name">{{ getAbilityName(currentAbilityId) }}</span>
+                <span class="skill-id">(ID: {{ currentAbilityId }})</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-text">无特性</div>
+        </div>
+
+        <!-- 编辑模式 -->
+        <div v-else>
+          <el-row :gutter="12">
+            <el-col :span="18">
+              <PaginatedSelect
+                v-model="editForm.abilityId"
+                placeholder="无特性"
+                :fetch-data="fetchAbilityData"
+              />
+            </el-col>
+            <el-col :span="6">
+              <el-button size="small" @click="editForm.abilityId = 0">清除特性</el-button>
+            </el-col>
+          </el-row>
+        </div>
       </el-card>
 
       <!-- 技能列表 -->
@@ -471,7 +498,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { InfoFilled, TrendCharts, Promotion, Star, MagicStick, Edit, Warning, Refresh } from '@element-plus/icons-vue'
+import { InfoFilled, TrendCharts, Promotion, Star, MagicStick, Edit, Warning, Refresh, Aim } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useConfigStore } from '@/stores/config'
 import { configApi } from '@/api/config'
@@ -577,7 +604,8 @@ const editForm = ref<any>({
   dvSpAtk: 0,
   dvSpDef: 0,
   dvSpeed: 0,
-  skillArray: []
+  skillArray: [],
+  abilityId: 0
 })
 
 // 监听外部变化
@@ -633,6 +661,35 @@ const getNatureName = (natureId: number) => {
 const getSkillName = (skillId: number | undefined) => {
   if (!skillId) return '未知技能'
   return configStore.skillNames[skillId] || `未知技能(${skillId})`
+}
+
+// 当前精灵的特性ID
+const currentAbilityId = computed(() => {
+  if (!props.pet || !props.pet.effectList || props.pet.effectList.length === 0) return 0
+  return props.pet.effectList[0].itemId || props.pet.effectList[0].effectID || 0
+})
+
+// 特性名称缓存
+const abilityNameCache = ref<Record<number, string>>({})
+
+// 获取特性名称
+const getAbilityName = (abilityId: number) => {
+  if (abilityNameCache.value[abilityId]) return abilityNameCache.value[abilityId]
+  // 异步加载
+  configApi.searchAbilities(String(abilityId), 1, 50).then((res: any) => {
+    const data = res.data || res
+    const found = data.items?.find((item: any) => item.value === abilityId)
+    if (found) {
+      abilityNameCache.value[abilityId] = found.label
+    }
+  }).catch(() => {})
+  return `特性 ${abilityId}`
+}
+
+// 获取特性数据（用于分页选择器）
+const fetchAbilityData = async (query: string, page: number, pageSize: number) => {
+  const res = await configApi.searchAbilities(query, page, pageSize) as any
+  return res.data || res
 }
 
 // 获取技能数据（用于分页选择器）
@@ -715,7 +772,8 @@ const startEdit = () => {
     dvSpAtk: props.pet.dvSpAtk || 0,
     dvSpDef: props.pet.dvSpDef || 0,
     dvSpeed: props.pet.dvSpeed || 0,
-    skillArray: props.pet.skillArray ? JSON.parse(JSON.stringify(props.pet.skillArray)) : []
+    skillArray: props.pet.skillArray ? JSON.parse(JSON.stringify(props.pet.skillArray)) : [],
+    abilityId: (props.pet.effectList && props.pet.effectList.length > 0) ? (props.pet.effectList[0].itemId || props.pet.effectList[0].effectID) : 0
   }
   
   // 确保技能数组有4个槽位
@@ -790,7 +848,8 @@ const saveEdit = async () => {
       dvSpAtk: editForm.value.dvSpAtk,
       dvSpDef: editForm.value.dvSpDef,
       dvSpeed: editForm.value.dvSpeed,
-      skills: skills
+      skills: skills,
+      effectList: editForm.value.abilityId > 0 ? [{ itemId: editForm.value.abilityId, status: 2, leftCount: -1, effectID: editForm.value.abilityId, args: '' }] : []
     }
     
     await gmApi.updatePet(updateData)

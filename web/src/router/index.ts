@@ -29,7 +29,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'tasks',
         name: 'Tasks',
-        component: () => import('@/views/config/Tasks.vue'),
+        component: () => import('@/views/config/任务配置.vue'),
         meta: { title: '任务配置' }
       },
       {
@@ -37,6 +37,18 @@ const routes: RouteRecordRaw[] = [
         name: 'UniqueItems',
         component: () => import('@/views/config/UniqueItems.vue'),
         meta: { title: '特殊物品配置' }
+      },
+      {
+        path: 'default-player',
+        name: 'DefaultPlayer',
+        component: () => import('@/views/config/默认玩家配置.vue'),
+        meta: { title: '默认玩家配置' }
+      },
+      {
+        path: 'shop',
+        name: 'Shop',
+        component: () => import('@/views/config/商店配置.vue'),
+        meta: { title: '商店配置' }
       }
     ]
   },

@@ -121,4 +121,5 @@ export interface IBattleInfo {
   winner?: number;         // 胜利者
   aiType?: string;         // AI类型
   startTime: number;       // 开始时间
+  bossId?: number;         // BOSS唯一ID（用于读取奖励配置）
 }
