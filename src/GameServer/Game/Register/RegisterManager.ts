@@ -181,7 +181,9 @@ export class RegisterManager {
         return;
       }
 
-      if (savedCode.code !== emailCode || savedCode.codeRes !== emailCodeRes) {
+      // 只验证用户输入的验证码，不验证 codeRes
+      // 因为验证码通过错误码返回，客户端无法正确保存 codeRes
+      if (savedCode.code !== emailCode) {
         Logger.Warn(`[RegisterManager] 验证码错误: ${email}, expected=${savedCode.code}, got=${emailCode}`);
         const packet = this._packetRegister.Build(0, RegisterResult.INVALID_CODE);
         session.Socket.write(packet);
