@@ -63,6 +63,10 @@ export class PacketParser {
     if (body.length > 0) {
       const bodyStr = CmdMeta.ParseBody(head.CmdID, body, true);
       Logger.Debug(`[收包] Body: ${bodyStr}`);
+      // 添加hex dump用于调试
+      if (head.CmdID === 2401 || head.CmdID === 2403) { // INVITE_TO_FIGHT, HANDLE_FIGHT_INVITE
+        Logger.Debug(`[收包] Hex: ${body.toString('hex')}`);
+      }
     }
 
     // 移除已解析的数据

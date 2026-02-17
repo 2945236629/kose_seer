@@ -50,9 +50,9 @@ export interface IBattlePet {
   skinID?: number;         // 皮肤ID（用于客户端显示）
   statusArray: number[];   // 状态数组(20字节) - 用于协议传输
   battleLv: number[];      // 战斗等级(6字节)
-  
+
   // 效果系统支持
-  battleLevels?: number[]; // 能力等级修正 (-6 到 +6) [ATK, DEF, SP_ATK, SP_DEF, SPEED, ACCURACY]
+  battleLevels?: number[]; // 能力等级修正 (-6 到 +6) [ATK, DEF, SP_ATK, SP_DEF, SPEED, ACC_EVA]
   effectCounters?: { [key: string]: any }; // 效果计数器（数值型为回合计数，特殊键存储被动特性等复杂数据）
   
   // 状态效果字段
@@ -122,4 +122,6 @@ export interface IBattleInfo {
   aiType?: string;         // AI类型
   startTime: number;       // 开始时间
   bossId?: number;         // BOSS唯一ID（用于读取奖励配置）
+  isPvp?: boolean;         // 是否为PVP战斗
+  player2Id?: number;      // PVP对手ID（仅PVP战斗有效）
 }

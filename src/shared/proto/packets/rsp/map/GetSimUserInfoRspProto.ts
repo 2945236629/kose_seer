@@ -78,8 +78,13 @@ export class GetSimUserInfoRspProto extends BaseProto {
     const nickBuf = Buffer.alloc(16);
     nickBuf.write(this.nick, 0, 16, 'utf8');
     
+    // 计算总大小：
+    // userId(4) + nick(16) + color(4) + texture(4) + vip(4) + status(4) + 
+    // mapType(4) + mapId(4) + isCanBeTeacher(4) + teacherID(4) + studentID(4) + 
+    // graduationCount(4) + vipLevel(4) + teamId(4) + teamIsShow(4) + clothCount(4) = 76字节
+    // + clothes数组 (每个8字节)
     const clothBufSize = 4 + this.clothes.length * 8;
-    const buffer = Buffer.alloc(64 + clothBufSize);
+    const buffer = Buffer.alloc(76 + clothBufSize);
     let offset = 0;
     
     buffer.writeUInt32BE(this.userId, offset); offset += 4;

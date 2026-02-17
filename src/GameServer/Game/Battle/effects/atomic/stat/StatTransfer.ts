@@ -170,7 +170,7 @@ export class StatTransfer extends BaseAtomicEffect {
    */
   private setStatLevel(pet: any, statIndex: number, level: number): void {
     if (!pet.battleLevels) {
-      pet.battleLevels = [0, 0, 0, 0, 0, 0, 0];
+      pet.battleLevels = [0, 0, 0, 0, 0, 0];
     }
     pet.battleLevels[statIndex] = Math.max(-6, Math.min(6, level));
   }

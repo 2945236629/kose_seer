@@ -192,7 +192,7 @@ export class RandomStatChange extends BaseAtomicEffect {
    */
   private applyStatChange(pet: any, statIndex: number, change: number): boolean {
     if (!pet.battleLevels) {
-      pet.battleLevels = [0, 0, 0, 0, 0, 0, 0];
+      pet.battleLevels = [0, 0, 0, 0, 0, 0];
     }
 
     const currentLevel = pet.battleLevels[statIndex] ?? 0;

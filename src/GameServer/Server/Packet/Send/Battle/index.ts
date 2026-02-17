@@ -8,3 +8,8 @@ export * from './PacketCatchMonster';
 export * from './PacketEscapeFight';
 export * from './PacketBattleReward';
 export * from './PacketChangePet';
+export * from './PacketInviteToFight';
+export * from './PacketInviteFightCancel';
+export * from './PacketHandleFightInvite';
+export * from './PacketNoteInviteToFight';
+export * from './PacketNoteHandleFightInvite';

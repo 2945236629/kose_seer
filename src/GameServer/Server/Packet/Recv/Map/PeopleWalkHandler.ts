@@ -21,11 +21,16 @@ export class PeopleWalkHandler implements IHandler {
 
     const req = PeopleWalkReqProto.fromBuffer(body);
 
+    const mapId = player.Data.mapID;
+    
     // 更新玩家位置
     const oldX = player.Data.posX;
     const oldY = player.Data.posY;
     player.Data.posX = req.x;
     player.Data.posY = req.y;
+
+    // 更新 OnlineTracker 中的实时位置
+    OnlineTracker.Instance.UpdatePlayerMap(player.Uid, mapId, 0, req.x, req.y);
 
     // 构建响应
     const rsp = new PeopleWalkRspProto(req.walkType, player.Uid, req.x, req.y, req.amfData);
@@ -34,7 +39,6 @@ export class PeopleWalkHandler implements IHandler {
     await player.SendPacket(rsp);
     
     // 主动推送地图野怪列表（额外响应）
-    const mapId = player.Data.mapID;
     if (mapId > 0) {
       const ogres = MapSpawnManager.Instance.GetMapOgres(player.Uid, mapId);
       

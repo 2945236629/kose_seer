@@ -5,24 +5,28 @@ import { IEffectContext, IEffectResult, EffectTiming } from '../../core/EffectCo
 /**
  * 能力变化原子效果
  * 修改目标的能力等级（攻击、防御、特攻、特防、速度、命中、闪避）
- * 
+ *
  * 能力索引：
  * - 0: 攻击 (Attack)
  * - 1: 防御 (Defense)
  * - 2: 特攻 (Special Attack)
  * - 3: 特防 (Special Defense)
  * - 4: 速度 (Speed)
- * - 5: 命中/闪避 (Accuracy/Evasion)
- * 
+ * - 5: 命中 (Accuracy)
+ * - 6: 闪避 (Evasion)
+ *
  * @example
  * // 提升自身攻击1级
  * { type: 'stat_modifier', target: 'self', stat: 0, change: 1, mode: 'level' }
- * 
+ *
  * // 降低对方防御2级
  * { type: 'stat_modifier', target: 'opponent', stat: 1, change: -2, mode: 'level' }
- * 
- * // 提升自身速度3级
- * { type: 'stat_modifier', target: 'self', stat: 4, change: 3, mode: 'level' }
+ *
+ * // 降低对方命中1级
+ * { type: 'stat_modifier', target: 'opponent', stat: 5, change: -1, mode: 'level' }
+ *
+ * // 提升自身闪避1级
+ * { type: 'stat_modifier', target: 'self', stat: 6, change: 1, mode: 'level' }
  */
 export class StatModifier extends BaseAtomicEffect {
   private params: IStatModifierParams;

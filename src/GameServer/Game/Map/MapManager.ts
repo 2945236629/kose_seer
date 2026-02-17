@@ -56,8 +56,16 @@ export class MapManager extends BaseManager {
     Logger.Info(`[MapManager] 玩家昵称: ${this.Player.Data.nick}`);
     Logger.Info(`[MapManager] 当前数据库 MapID: ${this.Player.Data.mapID}`);
 
-    // 更新在线追踪
-    this._onlineTracker.UpdatePlayerMap(this.UserID, mapId, mapType);
+    // 检查地图中已有的玩家
+    const existingPlayers = this._onlineTracker.GetPlayersInMap(mapId);
+    Logger.Info(`[MapManager] 地图 ${mapId} 当前已有玩家: ${existingPlayers.length}人 [${existingPlayers.join(', ')}]`);
+
+    // 更新在线追踪（包括位置）
+    this._onlineTracker.UpdatePlayerMap(this.UserID, mapId, mapType, x, y);
+
+    // 再次检查更新后的玩家列表
+    const updatedPlayers = this._onlineTracker.GetPlayersInMap(mapId);
+    Logger.Info(`[MapManager] 更新后地图 ${mapId} 玩家: ${updatedPlayers.length}人 [${updatedPlayers.join(', ')}]`);
 
     // 更新玩家位置（直接修改 PlayerData，实时保存）
     this.Player.Data.mapID = mapId;
@@ -77,7 +85,7 @@ export class MapManager extends BaseManager {
     await this.Player.SendPacket(new PacketEnterMap(userInfo));
     Logger.Info(`[MapManager] 已发送进入地图响应`);
 
-    // 主动推送 LIST_MAP_PLAYER (包含自己)
+    // 主动推送 LIST_MAP_PLAYER (包含自己和其他玩家)
     await this.sendMapPlayerList(mapId);
     
     // 主动推送 MAP_OGRE_LIST (地图野怪列表)
@@ -91,6 +99,8 @@ export class MapManager extends BaseManager {
     const sent = await this._onlineTracker.BroadcastToMap(mapId, enterPacket, this.UserID);
     if (sent > 0) {
       Logger.Info(`[MapManager] 广播玩家进入到 ${sent} 个玩家`);
+    } else {
+      Logger.Info(`[MapManager] 地图中没有其他玩家，无需广播`);
     }
     
     Logger.Info(`[MapManager] ========== 进入地图完成 ==========`);
@@ -287,12 +297,28 @@ export class MapManager extends BaseManager {
     const playerIds = this._onlineTracker.GetPlayersInMap(mapId);
     const players: SeerMapUserInfoProto[] = [];
 
+    Logger.Debug(`[MapManager] 构建地图 ${mapId} 玩家列表，在线玩家: ${playerIds.join(', ')}`);
+
     for (const pid of playerIds) {
       const playerSession = this._onlineTracker.GetPlayerSession(pid);
       if (playerSession?.Player) {
-        // 从数据库读取玩家数据
+        // 优先从在线玩家的 PlayerData 读取（实时数据）
+        const playerData = playerSession.Player.Data;
+        
+        // 使用 OnlineTracker 中的实时位置，而不是数据库中的旧位置
+        const position = this._onlineTracker.GetPlayerPosition(pid);
+        const x = position ? position.x : playerData.posX;
+        const y = position ? position.y : playerData.posY;
+        
+        const userInfo = this.buildUserInfo(pid, playerData, x, y);
+        players.push(userInfo);
+        Logger.Debug(`[MapManager] 添加玩家到列表: ${pid} (${playerData.nick}) 位置: (${x}, ${y})`);
+      } else {
+        // 如果玩家不在线（理论上不应该发生），从数据库读取
+        Logger.Warn(`[MapManager] 玩家 ${pid} 在地图列表中但未找到在线会话，从数据库读取`);
         const playerData = await this._playerRepo.FindByUserId(pid);
         if (playerData) {
+          // 离线玩家使用数据库位置
           const userInfo = this.buildUserInfo(
             pid,
             playerData,
@@ -309,7 +335,7 @@ export class MapManager extends BaseManager {
 
     await this.Player.SendPacket(rsp);
 
-    Logger.Info(`[MapManager] 发送地图 ${mapId} 玩家列表，共 ${players.length} 人`);
+    Logger.Info(`[MapManager] 发送地图 ${mapId} 玩家列表给玩家 ${this.UserID}，共 ${players.length} 人`);
   }
 
   /**

@@ -279,20 +279,18 @@ export class BattleCore {
       }
     }
 
-    // 4. 计算命中率（考虑能力等级）
+    // 4. 计算命中率（考虑命中/闪避等级）
     const accuracy = skill.accuracy || 100;
     if (accuracy >= 100) return true;
 
-    // 命中等级修正
+    // 命中等级 (攻击方 battleLv[5]) / 闪避等级 (防御方 battleLv[5])
     const accStage = attacker.battleLv[5] || 0;
-    const evaStage = 0; // 闪避等级 (暂未实现)
-    const stageMod = BattleAlgorithm.ApplyStageModifier(100, accStage - evaStage) / 100;
+    const evaStage = defender.battleLv[5] || 0;
+    const finalAcc = BattleAlgorithm.CalculateAccuracy(accuracy, accStage, evaStage);
 
-    const finalAcc = Math.floor(accuracy * stageMod);
-    
     // 5. 命中判定
     const hit = Math.random() * 100 <= finalAcc;
-    Logger.Debug(`[BattleCore] 命中判定: ${skill.name}, 命中率=${finalAcc}%, 结果=${hit}`);
+    Logger.Debug(`[BattleCore] 命中判定: ${skill.name}, 基础=${accuracy}%, 命中等级=${accStage}, 闪避等级=${evaStage}, 最终=${finalAcc}%, 结果=${hit}`);
     return hit;
   }
 

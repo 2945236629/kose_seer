@@ -14,6 +14,7 @@ import { TaskManager } from '../Task/TaskManager';
 import { PlayerRepository } from '../../../DataBase/repositories/Player/PlayerRepository';
 import { PlayerData } from '../../../DataBase/models/PlayerData';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
+import { PvpBattleManager } from '../Battle/PvpBattleManager';
 
 /**
  * 玩家实例
@@ -120,11 +121,17 @@ export class PlayerInstance {
   public async OnLogout(): Promise<void> {
     Logger.Info(`[Player ${this.Uid}] 玩家登出: ${this.Data.nick}`);
     
+    // 广播玩家离开地图（必须在保存数据前执行，因为需要知道玩家在哪个地图）
+    await this.MapManager.HandleLeaveMap();
+    
     // 实时保存该玩家的所有数据
     await DatabaseHelper.Instance.SaveUser(this.Uid);
     
     // 清理 BattleManager
     await this.BattleManager.OnLogout();
+    
+    // 清理 PVP 邀请
+    PvpBattleManager.Instance.OnPlayerLogout(this.Uid);
     
     // 清理Session中的Player引用
     this._session.Player = undefined;
@@ -150,7 +157,29 @@ export class PlayerInstance {
     await this.TaskManager.Initialize();
     await this.NoNoManager.Initialize();
     
+    // 同步服装数据：从 ItemData 提取服装物品到 PlayerData.clothes
+    this.syncClothesData();
+    
     this.Initialized = true;
+  }
+
+  /**
+   * 同步服装数据：从 ItemData 提取服装物品到 PlayerData.clothes
+   */
+  private syncClothesData(): void {
+    // 从 ItemData 中筛选出服装类物品（ID >= 100000）
+    const clothItems = this.ItemManager.ItemData.ItemList.filter(item => item.itemId >= 100000);
+    
+    // 转换为 clothes 格式
+    this.Data.clothes = clothItems.map(item => ({
+      id: item.itemId,
+      level: 0,  // 服装没有等级概念，默认为0
+      count: item.count
+    }));
+    
+    this.Data.clothCount = this.Data.clothes.length;
+    
+    Logger.Debug(`[PlayerInstance] 同步服装数据: UserID=${this.Uid}, 服装数量=${this.Data.clothCount}`);
   }
 
   // ===== 便捷方法 =====

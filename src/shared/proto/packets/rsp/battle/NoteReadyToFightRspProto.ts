@@ -25,8 +25,8 @@ export class NoteReadyToFightRspProto extends BaseProto {
   serialize(): Buffer {
     const writer = new BufferWriter(2048);
     
-    // 用户数量 (固定2个：玩家和敌人)
-    writer.WriteUInt32(2);
+    // 战斗ID (客户端期望的第一个字段)
+    writer.WriteUInt32(0);
     
     // 玩家信息
     writer.WriteUInt32(this.playerUserId);

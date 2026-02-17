@@ -1,5 +1,5 @@
 import { Logger } from '../../../../shared/utils';
-import { IBattleInfo, ITurnResult, IAttackResult } from '../../../../shared/models/BattleModel';
+import { IBattleInfo, ITurnResult, IAttackResult, IBattlePet } from '../../../../shared/models/BattleModel';
 import { ISkillConfig } from '../../../../shared/models/SkillModel';
 import { BattleTurnExecutor } from '../BattleTurnExecutor';
 import { BattleCaptureSystem, PokeBallType } from '../BattleCaptureSystem';
@@ -10,7 +10,7 @@ import { GameConfig } from '../../../../shared/config/game/GameConfig';
 /**
  * 战斗回合服务
  * 负责处理战斗回合逻辑、伤害计算、技能效果、捕获、逃跑等
- * 
+ *
  * 移植自: luvit/luvit_version/game/seer_battle.lua
  */
 export class BattleTurnService {
@@ -18,61 +18,54 @@ export class BattleTurnService {
   private escapeAttempts: Map<number, number> = new Map();
 
   /**
-   * 执行一个战斗回合
+   * 执行一个战斗回合（统一 PvE/PvP）
+   *
+   * @param battle 战斗实例
+   * @param pet1SkillId 玩家/玩家1选择的技能ID
+   * @param pet2SkillId PvP时玩家2的技能ID；undefined表示PvE模式（AI选技能）
+   * @returns 回合结果
    */
-  public ExecuteTurn(battle: IBattleInfo, playerSkillId: number): ITurnResult {
+  public ExecuteTurn(battle: IBattleInfo, pet1SkillId: number, pet2SkillId?: number): ITurnResult {
     // 增加回合数
     battle.turn++;
 
-    // 获取技能配置
+    const isPvp = pet2SkillId !== undefined;
+
+    // 加载所有技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
-    
-    // 加载玩家技能
+
     for (const skillId of battle.player.skills) {
-      const skillMove = GameConfig.GetSkillById(skillId);
-      if (skillMove) {
-        const skillConfig: ISkillConfig = {
-          id: skillMove.ID,
-          name: skillMove.Name,
-          category: skillMove.Category,
-          type: skillMove.Type,
-          power: skillMove.Power,
-          maxPP: skillMove.MaxPP,
-          accuracy: skillMove.Accuracy,
-          critRate: skillMove.CritRate || 1,
-          priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1,
-          sideEffect: skillMove.SideEffect,
-          sideEffectArg: skillMove.SideEffectArg
-        };
-        skillConfigs.set(skillId, skillConfig);
-      }
+      this.LoadSkillConfig(skillId, skillConfigs);
     }
-    
-    // 加载敌人技能
     for (const skillId of battle.enemy.skills) {
-      const skillMove = GameConfig.GetSkillById(skillId);
-      if (skillMove) {
-        const skillConfig: ISkillConfig = {
-          id: skillMove.ID,
-          name: skillMove.Name,
-          category: skillMove.Category,
-          type: skillMove.Type,
-          power: skillMove.Power,
-          maxPP: skillMove.MaxPP,
-          accuracy: skillMove.Accuracy,
-          critRate: skillMove.CritRate || 1,
-          priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1,
-          sideEffect: skillMove.SideEffect,
-          sideEffectArg: skillMove.SideEffectArg
-        };
-        skillConfigs.set(skillId, skillConfig);
-      }
+      this.LoadSkillConfig(skillId, skillConfigs);
     }
 
-    // 使用 BattleTurnExecutor 执行回合
-    return BattleTurnExecutor.ExecuteTurn(battle, playerSkillId, skillConfigs);
+    // 确保玩家选的技能也被加载
+    if (pet1SkillId > 0) this.LoadSkillConfig(pet1SkillId, skillConfigs);
+
+    if (isPvp) {
+      // PvP: 确保玩家2选的技能也被加载
+      if (pet2SkillId! > 0) this.LoadSkillConfig(pet2SkillId!, skillConfigs);
+
+      return BattleTurnExecutor.ExecuteTurn(
+        battle, pet1SkillId, pet2SkillId!, skillConfigs,
+        { isPvp: true, pet2UserId: battle.player2Id || 0 }
+      );
+    } else {
+      // PvE: AI选择敌方技能
+      const enemySkillId = BattleCore.AISelectSkill(
+        battle.enemy,
+        battle.player,
+        battle.enemy.skills,
+        skillConfigs
+      );
+      this.LoadSkillConfig(enemySkillId, skillConfigs);
+
+      return BattleTurnExecutor.ExecuteTurn(
+        battle, pet1SkillId, enemySkillId, skillConfigs
+      );
+    }
   }
 
   /**
@@ -82,27 +75,10 @@ export class BattleTurnService {
   public ExecuteEnemyTurn(battle: IBattleInfo): IAttackResult {
     // 获取技能配置
     const skillConfigs = new Map<number, ISkillConfig>();
-    
+
     // 加载敌人技能
     for (const skillId of battle.enemy.skills) {
-      const skillMove = GameConfig.GetSkillById(skillId);
-      if (skillMove) {
-        const skillConfig: ISkillConfig = {
-          id: skillMove.ID,
-          name: skillMove.Name,
-          category: skillMove.Category,
-          type: skillMove.Type,
-          power: skillMove.Power,
-          maxPP: skillMove.MaxPP,
-          accuracy: skillMove.Accuracy,
-          critRate: skillMove.CritRate || 1,
-          priority: skillMove.Priority || 0,
-          mustHit: skillMove.MustHit === 1,
-          sideEffect: skillMove.SideEffect,
-          sideEffectArg: skillMove.SideEffectArg
-        };
-        skillConfigs.set(skillId, skillConfig);
-      }
+      this.LoadSkillConfig(skillId, skillConfigs);
     }
 
     // AI选择技能
@@ -168,7 +144,7 @@ export class BattleTurnService {
 
     // 命中判定
     const hit = BattleCore.CheckHit(battle.enemy, battle.player, enemySkill);
-    
+
     // 暴击判定（敌人总是后手，所以 isFirst=false）
     const isCrit = hit && BattleCore.CheckCrit(battle.enemy, battle.player, enemySkill, false);
 
@@ -194,7 +170,7 @@ export class BattleTurnService {
     if (battle.enemy.status !== undefined) {
       enemyStatusArray[battle.enemy.status] = 1;
     }
-    
+
     return {
       userId: 0,
       skillId: enemySkillId,
@@ -214,8 +190,32 @@ export class BattleTurnService {
   }
 
   /**
+   * 加载技能配置到Map中
+   */
+  private LoadSkillConfig(skillId: number, skillConfigs: Map<number, ISkillConfig>): void {
+    if (skillConfigs.has(skillId)) return;
+    const skillMove = GameConfig.GetSkillById(skillId);
+    if (skillMove) {
+      skillConfigs.set(skillId, {
+        id: skillMove.ID,
+        name: skillMove.Name,
+        category: skillMove.Category,
+        type: skillMove.Type,
+        power: skillMove.Power,
+        maxPP: skillMove.MaxPP,
+        accuracy: skillMove.Accuracy,
+        critRate: skillMove.CritRate || 1,
+        priority: skillMove.Priority || 0,
+        mustHit: skillMove.MustHit === 1,
+        sideEffect: skillMove.SideEffect,
+        sideEffectArg: skillMove.SideEffectArg
+      });
+    }
+  }
+
+  /**
    * 处理逃跑
-   * 
+   *
    * 逃跑成功率计算：
    * - 基于玩家和敌人的速度差
    * - 每次失败后成功率提升
@@ -235,14 +235,14 @@ export class BattleTurnService {
 
     // 尝试逃跑
     const result = BattleEscapeSystem.AttemptEscape(battle, attempts);
-    
+
     // 更新尝试次数
     this.escapeAttempts.set(battleId, result.attempts);
 
     if (result.success) {
       battle.isOver = true;
       Logger.Info(`[BattleTurnService] 逃跑成功: 成功率=${result.escapeRate.toFixed(2)}%, 尝试次数=${result.attempts}`);
-      
+
       // 清理尝试次数记录
       this.escapeAttempts.delete(battleId);
     } else {
@@ -254,15 +254,15 @@ export class BattleTurnService {
 
   /**
    * 处理捕获
-   * 
+   *
    * 捕获成功率计算：
    * - 基于目标HP比例
    * - 异常状态增加捕获率
    * - 精灵球类型影响捕获率
    * - 等级越高越难捕获
    */
-  public Catch(battle: IBattleInfo, ballType: PokeBallType = PokeBallType.NORMAL): { 
-    success: boolean; 
+  public Catch(battle: IBattleInfo, ballType: PokeBallType = PokeBallType.NORMAL): {
+    success: boolean;
     catchTime: number;
     catchRate: number;
     shakeCount: number;
@@ -270,11 +270,11 @@ export class BattleTurnService {
     // 检查是否可以捕获
     const isBoss = battle.aiType?.includes('boss') || false;
     const canCapture = BattleCaptureSystem.CanCapture(battle.enemy, isBoss);
-    
+
     if (!canCapture.canCapture) {
       Logger.Warn(`[BattleTurnService] 无法捕获: ${canCapture.reason}`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         catchTime: 0,
         catchRate: 0,
         shakeCount: 0
@@ -303,8 +303,8 @@ export class BattleTurnService {
       );
     }
 
-    return { 
-      success: result.success, 
+    return {
+      success: result.success,
       catchTime: result.catchTime,
       catchRate: result.catchRate,
       shakeCount: result.shakeCount
@@ -340,4 +340,3 @@ export class BattleTurnService {
     this.escapeAttempts.delete(battleId);
   }
 }
-

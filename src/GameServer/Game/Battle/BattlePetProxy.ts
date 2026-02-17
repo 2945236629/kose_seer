@@ -38,6 +38,7 @@ export function createBattlePetProxy(pet: IBattlePet): IBattlePet {
   }
 
   // 创建 battleLevels 的 Proxy（监听数组元素修改，同步到 battleLv）
+  // 索引: 0=ATK, 1=DEF, 2=SP_ATK, 3=SP_DEF, 4=SPEED, 5=ACC/EVA
   const battleLevelsProxy = new Proxy(pet.battleLevels, {
     set(target: number[], index: string | symbol, value: any): boolean {
       const numIndex = typeof index === 'string' ? parseInt(index) : -1;

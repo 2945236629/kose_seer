@@ -11,6 +11,8 @@ interface IOnlinePlayer {
   userId: number;
   mapId: number;
   mapType: number;
+  posX: number;        // 实时X坐标
+  posY: number;        // 实时Y坐标
   loginTime: number;
   lastActive: number;
   session: IClientSession;
@@ -46,6 +48,8 @@ export class OnlineTracker {
         userId,
         mapId: 0,
         mapType: 0,
+        posX: 500,
+        posY: 300,
         loginTime: Date.now(),
         lastActive: Date.now(),
         session
@@ -75,7 +79,7 @@ export class OnlineTracker {
   /**
    * 更新玩家所在地图
    */
-  public UpdatePlayerMap(userId: number, newMapId: number, mapType: number = 0): void {
+  public UpdatePlayerMap(userId: number, newMapId: number, mapType: number = 0, posX: number = 500, posY: number = 300): void {
     let player = this._onlinePlayers.get(userId);
     if (!player) {
       Logger.Warn(`[OnlineTracker] 玩家 ${userId} 不在线，无法更新地图`);
@@ -94,9 +98,11 @@ export class OnlineTracker {
       this.addToMap(userId, newMapId);
     }
 
-    // 更新玩家信息
+    // 更新玩家信息（包括位置）
     player.mapId = newMapId;
     player.mapType = mapType;
+    player.posX = posX;
+    player.posY = posY;
     player.lastActive = Date.now();
 
     Logger.Info(`[OnlineTracker] 玩家 ${userId} 进入地图 ${newMapId} (旧地图: ${oldMapId})`);
@@ -166,6 +172,14 @@ export class OnlineTracker {
   public GetPlayerMap(userId: number): number {
     const player = this._onlinePlayers.get(userId);
     return player ? player.mapId : 0;
+  }
+
+  /**
+   * 获取玩家当前位置
+   */
+  public GetPlayerPosition(userId: number): { x: number; y: number } | null {
+    const player = this._onlinePlayers.get(userId);
+    return player ? { x: player.posX, y: player.posY } : null;
   }
 
   /**

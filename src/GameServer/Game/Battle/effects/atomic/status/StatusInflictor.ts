@@ -81,7 +81,13 @@ export class StatusInflictor extends BaseAtomicEffect {
     // 施加异常状态
     target.status = this.params.status;
     if (this.params.duration) {
-      target.statusTurns = this.params.duration;
+      // 持续伤害类状态（中毒、烧伤、冻伤、流血）需要+1回合
+      // 因为伤害在下一回合开始时才扣除，导致实际少一回合
+      const damageStatuses = [1, 2, 5, 11]; // 中毒、烧伤、冻伤、流血
+      const actualDuration = damageStatuses.includes(this.params.status) 
+        ? this.params.duration + 1 
+        : this.params.duration;
+      target.statusTurns = actualDuration;
     }
     // Proxy 会自动同步 statusArray 和 statusDurations
 

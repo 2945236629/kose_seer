@@ -1,7 +1,7 @@
 /**
  * 战斗回合执行器
  * 负责执行完整的战斗回合逻辑
- * 
+ *
  * 移植自: luvit/luvit_version/game/seer_battle.lua (executeTurn)
  */
 
@@ -14,92 +14,95 @@ import { EffectTiming } from './effects/core/EffectContext';
 import { BattleEffectIntegration } from './BattleEffectIntegration';
 
 /**
+ * 回合执行选项
+ */
+export interface ITurnOptions {
+  /** PvP模式：双方技能由玩家指定，不使用AI */
+  isPvp?: boolean;
+  /** PvP中敌方（pet2）的userId */
+  pet2UserId?: number;
+}
+
+/**
  * 战斗回合执行器类
  */
 export class BattleTurnExecutor {
 
   /**
-   * 执行一个完整的战斗回合
-   * 
+   * 执行一个完整的战斗回合（统一 PvE/PvP）
+   *
    * @param battle 战斗实例
-   * @param playerSkillId 玩家选择的技能ID
+   * @param pet1SkillId 玩家1/己方选择的技能ID
+   * @param pet2SkillId 敌方/玩家2的技能ID（PvE时由caller传AI选的技能，PvP时由玩家指定；0=换精灵不攻击）
    * @param skillConfigs 技能配置Map
+   * @param options 选项（isPvp、pet2UserId）
    * @returns 回合结果
    */
   public static ExecuteTurn(
     battle: IBattleInfo,
-    playerSkillId: number,
-    skillConfigs: Map<number, ISkillConfig>
+    pet1SkillId: number,
+    pet2SkillId: number,
+    skillConfigs: Map<number, ISkillConfig>,
+    options: ITurnOptions = {}
   ): ITurnResult {
-    Logger.Info(`\n========== 回合 ${battle.turn} ==========`);
-    Logger.Info(`玩家: ${battle.player.name} HP=${battle.player.hp}/${battle.player.maxHp}`);
-    Logger.Info(`敌人: ${battle.enemy.name} HP=${battle.enemy.hp}/${battle.enemy.maxHp}`);
+    const isPvp = options.isPvp === true;
+    const pet2UserId = options.pet2UserId ?? 0;
+
+    Logger.Info(`\n========== ${isPvp ? 'PVP ' : ''}回合 ${battle.turn} ==========`);
+    Logger.Info(`${isPvp ? '玩家1' : '玩家'}: ${battle.player.name} HP=${battle.player.hp}/${battle.player.maxHp}`);
+    Logger.Info(`${isPvp ? '玩家2' : '敌人'}: ${battle.enemy.name} HP=${battle.enemy.hp}/${battle.enemy.maxHp}`);
 
     // ==================== 回合开始效果 ====================
     const turnStartResults = BattleEffectIntegration.OnTurnStart(battle);
     if (turnStartResults.length > 0) {
-      Logger.Info(`[回合开始] 触发了${turnStartResults.length}个效果`);
+      Logger.Info(`[${isPvp ? 'PVP' : ''}回合开始] 触发了${turnStartResults.length}个效果`);
     }
-    
+
     // 检查回合开始效果是否导致死亡
     if (battle.player.hp <= 0) {
-      Logger.Info(`[回合开始] 玩家精灵阵亡，等待切换精灵`);
-      return {
-        isOver: false,
-        winner: undefined,
-        reason: 0
-      };
+      Logger.Info(`[回合开始] ${isPvp ? '玩家1' : '玩家'}精灵阵亡，等待切换精灵`);
+      return { isOver: false, winner: undefined, reason: 0 };
     }
     if (battle.enemy.hp <= 0) {
-      Logger.Info(`[回合开始] 敌人精灵阵亡，玩家胜利`);
+      Logger.Info(`[回合开始] ${isPvp ? '玩家2' : '敌人'}精灵阵亡，${isPvp ? '玩家1' : '玩家'}胜利`);
       battle.isOver = true;
-      return {
-        isOver: true,
-        winner: battle.userId,
-        reason: 0
-      };
+      return { isOver: true, winner: battle.userId, reason: 0 };
     }
 
-    // 1. 获取技能配置
-    const playerSkill = skillConfigs.get(playerSkillId) || this.GetDefaultSkill();
-    
-    // 2. AI选择技能
-    const enemySkillId = BattleCore.AISelectSkill(
-      battle.enemy,
-      battle.player,
-      battle.enemy.skills,
-      skillConfigs
-    );
-    const enemySkill = skillConfigs.get(enemySkillId) || this.GetDefaultSkill();
-    
-    Logger.Info(`玩家技能: ${playerSkill.name} | 敌人技能: ${enemySkill.name}`);
+    // 获取技能配置
+    // PvP中 skillId=0 表示换精灵，使用 GetNoActionSkill
+    const pet1Skill = pet1SkillId > 0
+      ? (skillConfigs.get(pet1SkillId) || this.GetDefaultSkill())
+      : (isPvp ? this.GetNoActionSkill() : (skillConfigs.get(pet1SkillId) || this.GetDefaultSkill()));
+    const pet2Skill = pet2SkillId > 0
+      ? (skillConfigs.get(pet2SkillId) || this.GetDefaultSkill())
+      : (isPvp ? this.GetNoActionSkill() : (skillConfigs.get(pet2SkillId) || this.GetDefaultSkill()));
 
-    // 3. 状态伤害已移至 ExecuteAttack 阶段1（ATTACK_START）
-    // 每个出手方的出手流程开始时处理对手身上的异常扣血
+    Logger.Info(`${isPvp ? '玩家1' : '玩家'}技能: ${pet1Skill.name} | ${isPvp ? '玩家2' : '敌人'}技能: ${pet2Skill.name}`);
 
-    // 4. 触发回合开始时的技能效果（如果有持续性技能效果）
-    // 注意：这里主要是状态效果，技能附加效果在攻击时触发
-    // 但某些特殊效果可能需要在回合开始时检查
-    this.ProcessTurnStartEffects(battle, playerSkill, enemySkill);
+    // PvE 专用：回合开始时的克制/持续效果
+    if (!isPvp) {
+      this.ProcessTurnStartEffects(battle, pet1Skill, pet2Skill);
+    }
 
-    // 4. 检查是否可以行动
-    const playerCanAct = BattleCore.CanAct(battle.player);
-    const enemyCanAct = BattleCore.CanAct(battle.enemy);
+    // 检查是否可以行动
+    // PvP中 skillId=0 表示换精灵，不攻击
+    const pet1CanAct = (isPvp && pet1SkillId === 0)
+      ? { canAct: false, reason: 'changePet' }
+      : BattleCore.CanAct(battle.player);
+    const pet2CanAct = (isPvp && pet2SkillId === 0)
+      ? { canAct: false, reason: 'changePet' }
+      : BattleCore.CanAct(battle.enemy);
 
     // ==================== 速度判定前效果 ====================
     const speedMods = BattleEffectIntegration.OnBeforeSpeedCheck(
-      battle.player,
-      battle.enemy,
-      playerSkill,
-      enemySkill
+      battle.player, battle.enemy, pet1Skill, pet2Skill
     );
 
-    // 5. 决定先后攻
-    const playerFirst = BattleCore.CompareSpeed(
-      battle.player,
-      battle.enemy,
-      playerSkill,
-      enemySkill,
+    // 决定先后手
+    const pet1First = BattleCore.CompareSpeed(
+      battle.player, battle.enemy,
+      pet1Skill, pet2Skill,
       {
         pet1AlwaysFirst: speedMods.playerAlwaysFirst,
         pet2AlwaysFirst: speedMods.enemyAlwaysFirst,
@@ -108,100 +111,77 @@ export class BattleTurnExecutor {
       }
     );
 
-    // ==================== 速度判定日志（综合） ====================
-    const playerPriority = (playerSkill.priority || 0) + speedMods.playerPriorityMod;
-    const enemyPriority = (enemySkill.priority || 0) + speedMods.enemyPriorityMod;
-    const playerSpeedStage = battle.player.battleLv?.[4] || 0;
-    const enemySpeedStage = battle.enemy.battleLv?.[4] || 0;
-    
-    Logger.Info(
-      `[速度判定] 回合${battle.turn} | ` +
-      `玩家[${battle.player.name}]: ` +
-      `${speedMods.playerAlwaysFirst ? '✓先制 ' : ''}` +
-      `优先度=${playerPriority}(${playerSkill.priority || 0}${speedMods.playerPriorityMod !== 0 ? `+${speedMods.playerPriorityMod}` : ''}) ` +
-      `速度=${battle.player.speed}${playerSpeedStage !== 0 ? `(${playerSpeedStage > 0 ? '+' : ''}${playerSpeedStage})` : ''} | ` +
-      `敌人[${battle.enemy.name}]: ` +
-      `${speedMods.enemyAlwaysFirst ? '✓先制 ' : ''}` +
-      `优先度=${enemyPriority}(${enemySkill.priority || 0}${speedMods.enemyPriorityMod !== 0 ? `+${speedMods.enemyPriorityMod}` : ''}) ` +
-      `速度=${battle.enemy.speed}${enemySpeedStage !== 0 ? `(${enemySpeedStage > 0 ? '+' : ''}${enemySpeedStage})` : ''} | ` +
-      `→ ${playerFirst ? '玩家先手' : '敌人先手'}`
-    );
+    // ==================== 速度判定日志 ====================
+    if (!isPvp) {
+      const playerPriority = (pet1Skill.priority || 0) + speedMods.playerPriorityMod;
+      const enemyPriority = (pet2Skill.priority || 0) + speedMods.enemyPriorityMod;
+      const playerSpeedStage = battle.player.battleLv?.[4] || 0;
+      const enemySpeedStage = battle.enemy.battleLv?.[4] || 0;
 
-    // 6. 执行攻击
-    const result: ITurnResult = {
-      isOver: false
-    };
+      Logger.Info(
+        `[速度判定] 回合${battle.turn} | ` +
+        `玩家[${battle.player.name}]: ` +
+        `${speedMods.playerAlwaysFirst ? '✓先制 ' : ''}` +
+        `优先度=${playerPriority}(${pet1Skill.priority || 0}${speedMods.playerPriorityMod !== 0 ? `+${speedMods.playerPriorityMod}` : ''}) ` +
+        `速度=${battle.player.speed}${playerSpeedStage !== 0 ? `(${playerSpeedStage > 0 ? '+' : ''}${playerSpeedStage})` : ''} | ` +
+        `敌人[${battle.enemy.name}]: ` +
+        `${speedMods.enemyAlwaysFirst ? '✓先制 ' : ''}` +
+        `优先度=${enemyPriority}(${pet2Skill.priority || 0}${speedMods.enemyPriorityMod !== 0 ? `+${speedMods.enemyPriorityMod}` : ''}) ` +
+        `速度=${battle.enemy.speed}${enemySpeedStage !== 0 ? `(${enemySpeedStage > 0 ? '+' : ''}${enemySpeedStage})` : ''} | ` +
+        `→ ${pet1First ? '玩家先手' : '敌人先手'}`
+      );
+    } else {
+      Logger.Info(
+        `[PVP速度判定] 回合${battle.turn} | ` +
+        `玩家1[${battle.player.name}]: 速度=${battle.player.speed} | ` +
+        `玩家2[${battle.enemy.name}]: 速度=${battle.enemy.speed} | ` +
+        `→ ${pet1First ? '玩家1先手' : '玩家2先手'}`
+      );
+    }
 
-    if (playerFirst) {
-      // 玩家先攻
+    // ==================== 执行攻击 ====================
+    const result: ITurnResult = { isOver: false };
+
+    if (pet1First) {
+      // pet1（玩家/玩家1）先攻
       result.firstAttack = this.ExecuteAttack(
-        battle,
-        battle.player,
-        battle.enemy,
-        playerSkill,
-        battle.userId,
-        playerCanAct,
-        true
+        battle, battle.player, battle.enemy,
+        pet1Skill, battle.userId, pet1CanAct, true
       );
 
-      // 检查敌人是否被击败
       if (battle.enemy.hp <= 0) {
-        // 敌人被击败，玩家胜利
         battle.isOver = true;
         result.isOver = true;
         result.winner = battle.userId;
         result.reason = 0;
       } else {
-        // 敌人反击
+        // pet2（敌人/玩家2）反击
         result.secondAttack = this.ExecuteAttack(
-          battle,
-          battle.enemy,
-          battle.player,
-          enemySkill,
-          0,
-          enemyCanAct,
-          false
+          battle, battle.enemy, battle.player,
+          pet2Skill, pet2UserId, pet2CanAct, false
         );
 
-        // 玩家精灵被击败，但不立即判输
-        // 等待玩家切换精灵，只有所有精灵都阵亡才判输
         if (battle.player.hp <= 0) {
-          Logger.Info(`[BattleTurnExecutor] 玩家精灵被击败，等待切换精灵`);
-          // 不设置 battle.isOver，让玩家有机会切换精灵
+          Logger.Info(`[BattleTurnExecutor] ${isPvp ? '玩家1' : '玩家'}精灵被击败，等待切换精灵`);
         }
       }
     } else {
-      // 敌人先攻
+      // pet2（敌人/玩家2）先攻
       result.firstAttack = this.ExecuteAttack(
-        battle,
-        battle.enemy,
-        battle.player,
-        enemySkill,
-        0,
-        enemyCanAct,
-        true
+        battle, battle.enemy, battle.player,
+        pet2Skill, pet2UserId, pet2CanAct, true
       );
 
-      // 检查玩家是否被击败
       if (battle.player.hp <= 0) {
-        // 玩家精灵被击败，但不立即判输
-        // 等待玩家切换精灵，只有所有精灵都阵亡才判输
-        Logger.Info(`[BattleTurnExecutor] 玩家精灵被击败，等待切换精灵`);
-        // 不设置 battle.isOver，让玩家有机会切换精灵
+        Logger.Info(`[BattleTurnExecutor] ${isPvp ? '玩家1' : '玩家'}精灵被击败，等待切换精灵`);
       } else {
-        // 玩家反击
+        // pet1（玩家/玩家1）反击
         result.secondAttack = this.ExecuteAttack(
-          battle,
-          battle.player,
-          battle.enemy,
-          playerSkill,
-          battle.userId,
-          playerCanAct,
-          false
+          battle, battle.player, battle.enemy,
+          pet1Skill, battle.userId, pet1CanAct, false
         );
 
         if (battle.enemy.hp <= 0) {
-          // 敌人被击败，玩家胜利
           battle.isOver = true;
           result.isOver = true;
           result.winner = battle.userId;
@@ -215,9 +195,8 @@ export class BattleTurnExecutor {
       const afterAttackEndResults = BattleEffectIntegration.OnAfterAttackEnd(battle);
       Logger.Debug(`[BattleTurnExecutor] 出手流程结束后效果: ${afterAttackEndResults.length}个结果`);
 
-      // 检查阶段9效果是否导致死亡
       if (battle.player.hp <= 0) {
-        Logger.Info(`[BattleTurnExecutor] 出手流程结束后效果导致玩家精灵阵亡，等待切换精灵`);
+        Logger.Info(`[BattleTurnExecutor] 出手流程结束后效果导致${isPvp ? '玩家1' : '玩家'}精灵阵亡`);
       } else if (battle.enemy.hp <= 0) {
         battle.isOver = true;
         result.isOver = true;
@@ -230,14 +209,10 @@ export class BattleTurnExecutor {
     if (!result.isOver) {
       const turnEndResults = BattleEffectIntegration.OnTurnEnd(battle);
       Logger.Debug(`[BattleTurnExecutor] 回合结束效果: ${turnEndResults.length}个结果`);
-      
-      // 检查回合结束效果是否导致死亡
+
       if (battle.player.hp <= 0) {
-        // 玩家精灵被击败，但不立即判输
-        Logger.Info(`[BattleTurnExecutor] 回合结束效果导致玩家精灵阵亡，等待切换精灵`);
-        // 不设置 battle.isOver，让玩家有机会切换精灵
+        Logger.Info(`[BattleTurnExecutor] 回合结束效果导致${isPvp ? '玩家1' : '玩家'}精灵阵亡`);
       } else if (battle.enemy.hp <= 0) {
-        // 敌人被击败，玩家胜利
         battle.isOver = true;
         result.isOver = true;
         result.winner = battle.userId;
@@ -535,6 +510,24 @@ export class BattleTurnExecutor {
   }
 
   /**
+   * 获取无动作技能（换精灵时使用，不产生攻击）
+   */
+  public static GetNoActionSkill(): ISkillConfig {
+    return {
+      id: 0,
+      name: '换精灵',
+      category: 4, // STATUS，不造成伤害
+      type: 8,
+      power: 0,
+      maxPP: 99,
+      accuracy: 0,
+      critRate: 0,
+      priority: 0,
+      mustHit: false
+    };
+  }
+
+  /**
    * 获取默认技能（撞击）
    */
   private static GetDefaultSkill(): ISkillConfig {
@@ -580,21 +573,12 @@ export class BattleTurnExecutor {
     }
 
     // 3. 触发回合开始时机的效果
-    // 注意：大部分效果在 AFTER_DAMAGE_APPLY 触发，这里主要处理特殊情况
     const playerTurnStartEffects = EffectTrigger.TriggerSkillEffect(
-      playerSkill,
-      battle.player,
-      battle.enemy,
-      0,
-      EffectTiming.TURN_START
+      playerSkill, battle.player, battle.enemy, 0, EffectTiming.TURN_START
     );
 
     const enemyTurnStartEffects = EffectTrigger.TriggerSkillEffect(
-      enemySkill,
-      battle.enemy,
-      battle.player,
-      0,
-      EffectTiming.TURN_START
+      enemySkill, battle.enemy, battle.player, 0, EffectTiming.TURN_START
     );
 
     // 应用效果
@@ -617,19 +601,11 @@ export class BattleTurnExecutor {
   ): void {
     // 1. 触发回合结束时机的效果
     const playerTurnEndEffects = EffectTrigger.TriggerSkillEffect(
-      playerSkill,
-      battle.player,
-      battle.enemy,
-      0,
-      EffectTiming.TURN_END
+      playerSkill, battle.player, battle.enemy, 0, EffectTiming.TURN_END
     );
 
     const enemyTurnEndEffects = EffectTrigger.TriggerSkillEffect(
-      enemySkill,
-      battle.enemy,
-      battle.player,
-      0,
-      EffectTiming.TURN_END
+      enemySkill, battle.enemy, battle.player, 0, EffectTiming.TURN_END
     );
 
     // 应用效果
@@ -640,8 +616,6 @@ export class BattleTurnExecutor {
       EffectTrigger.ApplyEffectResults(enemyTurnEndEffects, battle.enemy, battle.player);
     }
 
-    // 2. 减少状态持续时间（已在ProcessStatusEffects中处理）
-    // 这里可以添加额外的回合结束逻辑
     Logger.Debug(`[回合结束] 回合 ${battle.turn} 结束效果处理完成`);
   }
 }

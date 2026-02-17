@@ -5,6 +5,8 @@
  * 移植自: luvit/luvit_version/game/seer_algorithm.lua
  */
 
+import { NatureSystem, StatType } from "./NatureSystem";
+
 /**
  * 精灵种族值接口
  */
@@ -338,7 +340,8 @@ export class BattleAlgorithm {
   // ==================== 能力等级系统 ====================
 
   /**
-   * 能力等级倍率表 (等级 -6 到 +6)
+   * 攻防速等能力等级倍率表 (等级 -6 到 +6)
+   * 公式: 正向 (2+stage)/2, 负向 2/(2+|stage|)
    */
   private static readonly STAGE_MULTIPLIERS: { [stage: number]: number } = {
     [-6]: 2/8, [-5]: 2/7, [-4]: 2/6, [-3]: 2/5, [-2]: 2/4, [-1]: 2/3,
@@ -347,8 +350,23 @@ export class BattleAlgorithm {
   };
 
   /**
-   * 应用能力等级修正
-   * 
+   * 命中/闪避能力等级倍率表 (等级 -6 到 +6)
+   * 公式: 正向 (3+stage)/3, 负向 3/(3+|stage|)
+   * 参考宝可梦第三世代起的独立命中/闪避倍率
+   *
+   * -6    -5    -4    -3    -2    -1     0    +1    +2   +3   +4    +5   +6
+   * 3/9   3/8   3/7   3/6   3/5   3/4   1    4/3   5/3  6/3  7/3   8/3  9/3
+   * 0.33  0.38  0.43  0.50  0.60  0.75  1.0  1.33  1.67 2.0  2.33  2.67 3.0
+   */
+  private static readonly ACC_EVA_STAGE_MULTIPLIERS: { [stage: number]: number } = {
+    [-6]: 3/9, [-5]: 3/8, [-4]: 3/7, [-3]: 3/6, [-2]: 3/5, [-1]: 3/4,
+    [0]: 1,
+    [1]: 4/3, [2]: 5/3, [3]: 6/3, [4]: 7/3, [5]: 8/3, [6]: 9/3
+  };
+
+  /**
+   * 应用能力等级修正（攻击/防御/特攻/特防/速度）
+   *
    * @param baseStat 基础属性值
    * @param stage 能力等级 (-6 到 +6)
    * @returns 修正后的属性值
@@ -357,6 +375,35 @@ export class BattleAlgorithm {
     stage = Math.max(-6, Math.min(6, stage));
     const multiplier = this.STAGE_MULTIPLIERS[stage] || 1;
     return Math.floor(baseStat * multiplier);
+  }
+
+  /**
+   * 获取命中/闪避等级的倍率
+   *
+   * @param stage 命中或闪避等级 (-6 到 +6)
+   * @returns 倍率 (如 +1 → 4/3 ≈ 1.333)
+   */
+  public static GetAccuracyStageMultiplier(stage: number): number {
+    stage = Math.max(-6, Math.min(6, stage));
+    return this.ACC_EVA_STAGE_MULTIPLIERS[stage] || 1;
+  }
+
+  /**
+   * 计算最终命中率
+   * 公式: baseAccuracy × (命中等级倍率 / 闪避等级倍率)
+   *
+   * 例: 技能命中80, 命中+1, 对方闪避+2
+   *   = 80 × (4/3) / (5/3) = 80 × 4/5 = 64%
+   *
+   * @param baseAccuracy 技能基础命中率 (0-100)
+   * @param accStage 攻击方命中等级 (-6 到 +6)
+   * @param evaStage 防御方闪避等级 (-6 到 +6)
+   * @returns 最终命中率百分比
+   */
+  public static CalculateAccuracy(baseAccuracy: number, accStage: number, evaStage: number): number {
+    const accMul = this.GetAccuracyStageMultiplier(accStage);
+    const evaMul = this.GetAccuracyStageMultiplier(evaStage);
+    return Math.floor(baseAccuracy * accMul / evaMul);
   }
 
   // ==================== 属性克制系统 ====================
@@ -416,8 +463,6 @@ export class BattleAlgorithm {
    * @returns 性格修正值
    */
   private static GetNatureModifiers(natureId: number): INatureModifiers {
-    // 使用 NatureSystem 获取性格修正
-    const { NatureSystem, StatType } = require('./NatureSystem');
     
     return {
       attack: NatureSystem.GetStatModifier(natureId, StatType.ATTACK),

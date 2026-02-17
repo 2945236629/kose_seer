@@ -35,6 +35,24 @@ export class ItemManager extends BaseManager {
   }
 
   /**
+   * 同步服装数据到 PlayerData
+   * 从 ItemData 提取服装物品（ID >= 100000）到 PlayerData.clothes
+   */
+  private syncClothesToPlayerData(): void {
+    const clothItems = this.ItemData.ItemList.filter(item => item.itemId >= 100000);
+    
+    this.Player.Data.clothes = clothItems.map(item => ({
+      id: item.itemId,
+      level: 0,
+      count: item.count
+    }));
+    
+    this.Player.Data.clothCount = this.Player.Data.clothes.length;
+    
+    Logger.Debug(`[ItemManager] 同步服装数据: UserID=${this.UserID}, 服装数量=${this.Player.Data.clothCount}`);
+  }
+
+  /**
    * 处理购买物品
    * 
    * @param itemId 物品ID
@@ -73,6 +91,11 @@ export class ItemManager extends BaseManager {
     this.ItemData.AddItem(itemId, count, 0x057E40);
     await DatabaseHelper.Instance.SaveItemData(this.ItemData);
 
+    // 如果是服装物品，同步到 PlayerData.clothes
+    if (itemId >= 100000) {
+      this.syncClothesToPlayerData();
+    }
+
     // 发送成功响应（result = 0）
     await this.Player.SendPacket(new PacketItemBuy(playerData.coins, itemId, count, 0));
     Logger.Info(`[ItemManager] 玩家 ${this.UserID} 购买物品 ${itemId} x${count}, 剩余金币 ${playerData.coins}`);
@@ -101,6 +124,11 @@ export class ItemManager extends BaseManager {
       
       Logger.Debug(`[ItemManager] 准备保存 ItemData: Uid=${this.ItemData.Uid}`);
       await DatabaseHelper.Instance.SaveItemData(this.ItemData);
+      
+      // 如果是服装物品，同步到 PlayerData.clothes
+      if (itemId >= 100000) {
+        this.syncClothesToPlayerData();
+      }
       
       Logger.Info(`[ItemManager] 赠送物品成功: UserId=${this.UserID}, ItemId=${itemId}, Count=${count}`);
       return true;

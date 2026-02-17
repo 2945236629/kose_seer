@@ -7,7 +7,6 @@ export * from './BattleManager';
 export * from './BattleAlgorithm';
 export * from './BattleCore';
 export * from './BattleTurnExecutor';
-export * from './BattleLogger';
 export * from './BattleCaptureSystem';
 export * from './BattleEscapeSystem';
 export * from './BattleConverter';
