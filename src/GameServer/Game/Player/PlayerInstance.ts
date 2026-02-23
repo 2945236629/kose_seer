@@ -4,6 +4,7 @@ import { Logger } from '../../../shared/utils';
 import { BaseProto } from '../../../shared/proto';
 import { ItemManager } from '../Item/ItemManager';
 import { MapManager } from '../Map/MapManager';
+import { MapSpawnManager } from '../Map/MapSpawnManager';
 import { PetManager } from '../Pet/PetManager';
 import { SystemManager } from '../System/SystemManager';
 import { NoNoManager } from '../NoNo/NoNoManager';
@@ -44,6 +45,7 @@ export class PlayerInstance {
   // ===== Managers =====
   public ItemManager: ItemManager;
   public MapManager: MapManager;
+  public MapSpawnManager: MapSpawnManager;
   public PetManager: PetManager;
   public SystemManager: SystemManager;
   public NoNoManager: NoNoManager;
@@ -61,6 +63,7 @@ export class PlayerInstance {
     // 初始化所有 Manager
     this.ItemManager = new ItemManager(this);
     this.MapManager = new MapManager(this);
+    this.MapSpawnManager = new MapSpawnManager(this);
     this.PetManager = new PetManager(this);
     this.SystemManager = new SystemManager(this);
     this.NoNoManager = new NoNoManager(this);

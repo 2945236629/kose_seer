@@ -8,7 +8,6 @@ import { BattleConverter } from './BattleConverter';
 import { PacketEmpty } from '../../Server/Packet/Send/PacketEmpty';
 import { CommandID } from '../../../shared/protocol/CommandID';
 import { GameConfig } from '../../../shared/config/game/GameConfig';
-import { MapSpawnManager } from '../Map/MapSpawnManager';
 import { BattleEffectIntegration } from './BattleEffectIntegration';
 import { SimplePetInfoProto } from '../../../shared/proto/common/SimplePetInfoProto';
 import { AttackValueProto } from '../../../shared/proto/common/AttackValueProto';
@@ -303,7 +302,7 @@ export class BattleManager extends BaseManager {
   private async CleanupPveMap(): Promise<void> {
     if (this._currentBattleSlot < 0) return;
 
-    MapSpawnManager.Instance.OnBattleEnd(this.UserID, this._currentBattleSlot);
+    this.Player.MapSpawnManager.OnBattleEnd(this._currentBattleSlot);
     Logger.Info(`[BattleManager] 战斗结束，移除野怪: userId=${this.UserID}, slot=${this._currentBattleSlot}`);
 
     await this.SendOgreListUpdate();
@@ -459,7 +458,7 @@ export class BattleManager extends BaseManager {
 
       // 使用 MapSpawnManager 获取玩家的野怪列表
       const mapId = this.Player.Data.mapID || 1;
-      const ogres = MapSpawnManager.Instance.GetMapOgres(this.UserID, mapId);
+      const ogres = this.Player.MapSpawnManager.GetMapOgres(mapId);
 
       // 检查索引位置是否有怪物
       if (!ogres[monsterIndex] || ogres[monsterIndex].petId <= 0) {
@@ -1329,7 +1328,7 @@ export class BattleManager extends BaseManager {
    * 发送BOSS移除通知
    */
   private async SendBossRemovalNotification(region: number): Promise<void> {
-    const bossRemoval = MapSpawnManager.Instance.RemoveBoss(this.UserID, region);
+    const bossRemoval = this.Player.MapSpawnManager.RemoveBoss(region);
     if (bossRemoval) {
       await this.Player.SendPacket(new PacketMapBoss([bossRemoval]));
       Logger.Info(`[BattleManager] 推送BOSS移除通知: region=${region}`);
@@ -1341,7 +1340,7 @@ export class BattleManager extends BaseManager {
    */
   private async SendOgreListUpdate(): Promise<void> {
     const mapId = this.Player.Data.mapID || 1;
-    const ogres = MapSpawnManager.Instance.GetMapOgres(this.UserID, mapId);
+    const ogres = this.Player.MapSpawnManager.GetMapOgres(mapId);
 
     if (ogres.length > 0) {
       await this.Player.SendPacket(new PacketMapOgreList(ogres));

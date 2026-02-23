@@ -1,11 +1,11 @@
+import { CommandID } from '../CommandID';
+import { ICommandMeta } from './CommandMetaRegistry';
+
 /**
  * 精灵模块元数据
  * 包含精灵相关的所有命令元数据定义
  */
-import { CommandID } from '../CommandID';
-import { ICommandMeta } from './CommandMetaRegistry';
-
-export const PetModuleMetadata: ICommandMeta[] = [
+export const petMeta: ICommandMeta[] = [
   {
     cmdID: CommandID.GET_PET_INFO,
     name: 'GET_PET_INFO',
@@ -44,7 +44,8 @@ export const PetModuleMetadata: ICommandMeta[] = [
     name: 'PET_RELEASE',
     desc: '释放精灵',
     request: [
-      { name: 'catchTime', type: 'uint32', desc: '捕获时间' }
+      { name: 'catchId', type: 'uint32', desc: '捕获ID' },
+      { name: 'flag', type: 'uint32', desc: '标志' }
     ],
     response: [
       { name: 'result', type: 'uint32', desc: '结果 (0=成功)' }
@@ -55,7 +56,8 @@ export const PetModuleMetadata: ICommandMeta[] = [
     name: 'PET_SHOW',
     desc: '展示精灵',
     request: [
-      { name: 'catchTime', type: 'uint32', desc: '捕获时间' }
+      { name: 'catchTime', type: 'uint32', desc: '捕获时间' },
+      { name: 'flag', type: 'uint32', desc: '标志' }
     ],
     response: [
       { name: 'result', type: 'uint32', desc: '结果 (0=成功)' }
@@ -79,6 +81,71 @@ export const PetModuleMetadata: ICommandMeta[] = [
     desc: '设置默认精灵',
     request: [
       { name: 'catchTime', type: 'uint32', desc: '捕获时间' }
+    ],
+    response: [
+      { name: 'result', type: 'uint32', desc: '结果 (0=成功)' }
+    ]
+  },
+  {
+    cmdID: CommandID.PET_ONE_CURE,
+    name: 'PET_ONE_CURE',
+    desc: '恢复单个精灵HP',
+    request: [
+      { name: 'catchTime', type: 'uint32', desc: '捕获时间' }
+    ],
+    response: [
+      { name: 'result', type: 'uint32', desc: '结果 (0=成功)' }
+    ]
+  },
+  {
+    cmdID: CommandID.PET_EVOLVTION,
+    name: 'PET_EVOLVTION',
+    desc: '精灵进化',
+    request: [
+      { name: 'catchTime', type: 'uint32', desc: '捕获时间' }
+    ],
+    response: [
+      { name: 'status', type: 'uint32', desc: '进化状态' }
+    ]
+  },
+  {
+    cmdID: CommandID.PET_SET_EXP,
+    name: 'PET_SET_EXP',
+    desc: '设置精灵经验分配',
+    request: [
+      { name: 'catchTime', type: 'uint32', desc: '捕获时间' },
+      { name: 'exp', type: 'uint32', desc: '分配经验值' }
+    ],
+    response: [
+      { name: 'remainingAllocExp', type: 'uint32', desc: '剩余可分配经验' }
+    ]
+  },
+  {
+    cmdID: CommandID.PET_GET_EXP,
+    name: 'PET_GET_EXP',
+    desc: '获取精灵经验分配信息',
+    request: [],
+    response: [
+      { name: 'allocatableExp', type: 'uint32', desc: '可分配经验' }
+    ]
+  },
+  {
+    cmdID: CommandID.PET_ROOM_LIST,
+    name: 'PET_ROOM_LIST',
+    desc: '获取精灵仓库列表',
+    request: [],
+    response: [
+      { name: 'petCount', type: 'uint32', desc: '精灵数量' },
+      { name: 'petList', type: 'bytes', desc: '精灵列表数据' }
+    ]
+  },
+  {
+    cmdID: CommandID.Skill_Sort,
+    name: 'Skill_Sort',
+    desc: '技能排序',
+    request: [
+      { name: 'catchTime', type: 'uint32', desc: '捕获时间' },
+      { name: 'skillIds', type: 'array', desc: '技能ID数组(4个)' }
     ],
     response: [
       { name: 'result', type: 'uint32', desc: '结果 (0=成功)' }

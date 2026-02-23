@@ -3,7 +3,6 @@ import { HeadInfo } from '../../../../../shared/protocol';
 import { Opcode, InjectType } from '../../../../../shared/decorators';
 import { CommandID } from '../../../../../shared/protocol/CommandID';
 import { PacketMapOgreList } from '../../Send/Map/PacketMapOgreList';
-import { MapSpawnManager } from '../../../../Game/Map/MapSpawnManager';
 import { Logger } from '../../../../../shared/utils';
 
 /**
@@ -24,7 +23,7 @@ export class MapOgreListHandler implements IHandler {
     const mapId = player.Data.mapID;
     
     // 使用 MapSpawnManager 获取玩家的野怪列表
-    const ogres = MapSpawnManager.Instance.GetMapOgres(player.Uid, mapId);
+    const ogres = player.MapSpawnManager.GetMapOgres(mapId);
     
     // 发送响应
     await player.SendPacket(new PacketMapOgreList(ogres));

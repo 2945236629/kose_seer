@@ -5,7 +5,6 @@ import { CommandID } from '../../../../../shared/protocol/CommandID';
 import { PeopleWalkReqProto } from '../../../../../shared/proto/packets/req/map/PeopleWalkReqProto';
 import { PeopleWalkRspProto } from '../../../../../shared/proto/packets/rsp/map/PeopleWalkRspProto';
 import { OnlineTracker } from '../../../../Game/Player/OnlineTracker';
-import { MapSpawnManager } from '../../../../Game/Map/MapSpawnManager';
 import { PacketMapOgreList } from '../../Send/Map/PacketMapOgreList';
 import { Logger } from '../../../../../shared/utils';
 
@@ -40,7 +39,7 @@ export class PeopleWalkHandler implements IHandler {
     
     // 主动推送地图野怪列表（额外响应）
     if (mapId > 0) {
-      const ogres = MapSpawnManager.Instance.GetMapOgres(player.Uid, mapId);
+      const ogres = player.MapSpawnManager.GetMapOgres(mapId);
       
       await player.SendPacket(new PacketMapOgreList(ogres));
       

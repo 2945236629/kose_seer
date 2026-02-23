@@ -1,6 +1,6 @@
 /**
  * 地图野怪刷新管理器
- * 负责管理每个玩家在每个地图的野怪刷新状态
+ * 负责管理玩家在地图的野怪刷新状态
  * 
  * 功能：
  * 1. 玩家进入地图时随机刷新
@@ -11,6 +11,7 @@
 
 import { Logger } from '../../../shared/utils/Logger';
 import { GameConfig } from '../../../shared/config/game/GameConfig';
+import { BaseManager } from '../Base/BaseManager';
 
 /**
  * 单个野怪刷新状态
@@ -25,90 +26,59 @@ export interface ISpawnedOgre {
 }
 
 /**
- * 玩家地图状态
+ * 地图野怪刷新管理器
  */
-export interface IPlayerMapState {
-  userId: number;
-  mapId: number;
-  ogres: ISpawnedOgre[];   // 当前刷新的野怪列表
-  enterTime: number;       // 进入地图时间
-}
-
-/**
- * 地图野怪刷新管理器（单例）
- */
-export class MapSpawnManager {
-  private static _instance: MapSpawnManager;
+export class MapSpawnManager extends BaseManager {
+  /** 当前地图ID */
+  private _currentMapId: number = 0;
   
-  /** 玩家地图状态缓存 (key: userId) */
-  private _playerStates: Map<number, IPlayerMapState> = new Map();
-
-  private constructor() {}
-
-  public static get Instance(): MapSpawnManager {
-    if (!MapSpawnManager._instance) {
-      MapSpawnManager._instance = new MapSpawnManager();
-    }
-    return MapSpawnManager._instance;
-  }
+  /** 当前刷新的野怪列表 */
+  private _ogres: ISpawnedOgre[] = [];
+  
+  /** 进入地图时间 */
+  private _enterTime: number = 0;
 
   /**
    * 玩家进入地图（生成新的野怪列表）
-   * @param userId 玩家ID
    * @param mapId 地图ID
    */
-  public OnPlayerEnterMap(userId: number, mapId: number): void {
-    // 清除旧状态（如果有）
-    this._playerStates.delete(userId);
+  public OnEnterMap(mapId: number): void {
+    // 清除旧状态
+    this._ogres = [];
+    this._currentMapId = mapId;
+    this._enterTime = Date.now();
     
     // 生成新的野怪列表
-    const ogres = this.GenerateOgres(mapId);
-    
-    const playerState: IPlayerMapState = {
-      userId,
-      mapId,
-      ogres,
-      enterTime: Date.now()
-    };
-    
-    this._playerStates.set(userId, playerState);
+    this._ogres = this.GenerateOgres(mapId);
     
     Logger.Info(
-      `[MapSpawnManager] 玩家进入地图: userId=${userId}, mapId=${mapId}, ` +
-      `野怪数量=${ogres.length}`
+      `[MapSpawnManager] 玩家进入地图: userId=${this.UserID}, mapId=${mapId}, ` +
+      `野怪数量=${this._ogres.length}`
     );
   }
 
   /**
    * 玩家离开地图（清除状态）
-   * @param userId 玩家ID
    */
-  public OnPlayerLeaveMap(userId: number): void {
-    const state = this._playerStates.get(userId);
-    if (state) {
-      Logger.Info(
-        `[MapSpawnManager] 玩家离开地图: userId=${userId}, mapId=${state.mapId}`
-      );
-      this._playerStates.delete(userId);
-    }
+  public OnLeaveMap(): void {
+    Logger.Info(
+      `[MapSpawnManager] 玩家离开地图: userId=${this.UserID}, mapId=${this._currentMapId}`
+    );
+    this._ogres = [];
+    this._currentMapId = 0;
   }
 
   /**
-   * 获取玩家当前地图的野怪列表
-   * @param userId 玩家ID
+   * 获取当前地图的野怪列表
    * @param mapId 地图ID（用于验证）
    * @returns 9个槽位的野怪列表
    */
   public GetMapOgres(
-    userId: number,
     mapId: number
   ): Array<{ petId: number; shiny: number; originalPetId: number }> {
-    const playerState = this._playerStates.get(userId);
-    
-    // 如果没有状态或地图不匹配，生成新的
-    if (!playerState || playerState.mapId !== mapId) {
-      this.OnPlayerEnterMap(userId, mapId);
-      return this.GetMapOgres(userId, mapId);
+    // 如果地图不匹配，生成新的
+    if (this._currentMapId !== mapId) {
+      this.OnEnterMap(mapId);
     }
 
     // 初始化9个空槽位
@@ -117,7 +87,7 @@ export class MapSpawnManager {
       .map(() => ({ petId: 0, shiny: 0, originalPetId: 0 }));
 
     // 填充野怪到对应槽位
-    for (const ogre of playerState.ogres) {
+    for (const ogre of this._ogres) {
       if (ogre.isVisible && ogre.slot >= 0 && ogre.slot < 9) {
         result[ogre.slot] = {
           petId: ogre.petId,
@@ -132,38 +102,31 @@ export class MapSpawnManager {
 
   /**
    * 战斗结束后移除野怪
-   * @param userId 玩家ID
    * @param slot 槽位索引
    */
-  public OnBattleEnd(userId: number, slot: number): void {
-    const playerState = this._playerStates.get(userId);
-    if (!playerState) {
-      Logger.Warn(`[MapSpawnManager] 玩家状态不存在: userId=${userId}`);
-      return;
-    }
-
+  public OnBattleEnd(slot: number): void {
     // 移除该槽位的野怪
-    const index = playerState.ogres.findIndex(o => o.slot === slot);
+    const index = this._ogres.findIndex(o => o.slot === slot);
     if (index !== -1) {
-      const removedOgre = playerState.ogres[index];
-      playerState.ogres.splice(index, 1);
+      const removedOgre = this._ogres[index];
+      this._ogres.splice(index, 1);
       
       Logger.Info(
-        `[MapSpawnManager] 移除野怪: userId=${userId}, slot=${slot}, ` +
-        `petId=${removedOgre.petId}, 剩余=${playerState.ogres.length}`
+        `[MapSpawnManager] 移除野怪: userId=${this.UserID}, slot=${slot}, ` +
+        `petId=${removedOgre.petId}, 剩余=${this._ogres.length}`
       );
       
       // 如果是最后一只野怪，重新刷新整个地图
-      if (playerState.ogres.length === 0) {
+      if (this._ogres.length === 0) {
         Logger.Info(
           `[MapSpawnManager] 最后一只野怪被打败，重新刷新地图: ` +
-          `userId=${userId}, mapId=${playerState.mapId}`
+          `userId=${this.UserID}, mapId=${this._currentMapId}`
         );
-        this.OnPlayerEnterMap(userId, playerState.mapId);
+        this.OnEnterMap(this._currentMapId);
       }
     } else {
       Logger.Warn(
-        `[MapSpawnManager] 未找到槽位野怪: userId=${userId}, slot=${slot}`
+        `[MapSpawnManager] 未找到槽位野怪: userId=${this.UserID}, slot=${slot}`
       );
     }
   }
@@ -302,29 +265,11 @@ export class MapSpawnManager {
   }
 
   /**
-   * 清除玩家状态（用于测试或登出）
-   */
-  public ClearPlayerState(userId: number): void {
-    this._playerStates.delete(userId);
-    Logger.Info(`[MapSpawnManager] 清除玩家状态: userId=${userId}`);
-  }
-
-  /**
-   * 清除所有状态
-   */
-  public ClearAllStates(): void {
-    this._playerStates.clear();
-    Logger.Info(`[MapSpawnManager] 清除所有状态`);
-  }
-
-  /**
    * 获取地图的BOSS列表
-   * @param userId 玩家ID
    * @param mapId 地图ID
    * @returns BOSS信息列表
    */
   public GetMapBosses(
-    userId: number,
     mapId: number
   ): Array<{ id: number; region: number; hp: number; pos: number }> {
     const mapConfig = GameConfig.GetMapConfigById(mapId);
@@ -350,18 +295,16 @@ export class MapSpawnManager {
       }
     }
 
-    Logger.Debug(`[MapSpawnManager] 获取BOSS列表: userId=${userId}, mapId=${mapId}, count=${bosses.length}`);
+    Logger.Debug(`[MapSpawnManager] 获取BOSS列表: userId=${this.UserID}, mapId=${mapId}, count=${bosses.length}`);
     return bosses;
   }
 
   /**
    * 移除BOSS（战斗结束后）
-   * @param userId 玩家ID
    * @param region BOSS区域/槽位
    * @returns 移除的BOSS信息（用于推送）
    */
   public RemoveBoss(
-    userId: number,
     region: number
   ): { id: number; region: number; hp: number; pos: number } | null {
     // 返回移除标记（pos=200）
@@ -373,3 +316,4 @@ export class MapSpawnManager {
     };
   }
 }
+

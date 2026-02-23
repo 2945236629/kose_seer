@@ -12,7 +12,6 @@ import { PlayerRepository } from '../../../DataBase/repositories/Player/PlayerRe
 import { IPlayerInfo } from '../../../shared/models';
 import { PlayerInstance } from '../Player/PlayerInstance';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
-import { MapSpawnManager } from './MapSpawnManager';
 import { 
   PacketEnterMap,
   PacketLeaveMap,
@@ -76,7 +75,7 @@ export class MapManager extends BaseManager {
     Logger.Info(`[MapManager] 已更新玩家位置到地图 ${mapId}`);
 
     // 通知 MapSpawnManager 玩家进入地图（生成新的野怪列表）
-    MapSpawnManager.Instance.OnPlayerEnterMap(this.UserID, mapId);
+    this.Player.MapSpawnManager.OnEnterMap(mapId);
 
     // 构建用户信息（使用 PlayerData）
     const userInfo = this.buildUserInfo(this.UserID, this.Player.Data, x, y);
@@ -123,7 +122,7 @@ export class MapManager extends BaseManager {
     }
 
     // 通知 MapSpawnManager 玩家离开地图（清除状态）
-    MapSpawnManager.Instance.OnPlayerLeaveMap(this.UserID);
+    this.Player.MapSpawnManager.OnLeaveMap();
 
     // 更新在线追踪（设置为地图0）
     this._onlineTracker.UpdatePlayerMap(this.UserID, 0, 0);
@@ -150,7 +149,7 @@ export class MapManager extends BaseManager {
     const mapId = this.Player.Data.mapID || 1;
 
     // 使用 MapSpawnManager 获取玩家的野怪列表
-    const ogres = MapSpawnManager.Instance.GetMapOgres(this.UserID, mapId);
+    const ogres = this.Player.MapSpawnManager.GetMapOgres(mapId);
 
     await this.Player.SendPacket(new PacketMapOgreList(ogres));
   }
@@ -160,7 +159,7 @@ export class MapManager extends BaseManager {
    * @param mapId 地图ID
    */
   private async sendMapBossList(mapId: number): Promise<void> {
-    const bosses = MapSpawnManager.Instance.GetMapBosses(this.UserID, mapId);
+    const bosses = this.Player.MapSpawnManager.GetMapBosses(mapId);
     
     // 只在有BOSS时才推送
     if (bosses.length > 0) {
@@ -351,7 +350,7 @@ export class MapManager extends BaseManager {
   private async sendMapOgreList(mapId: number): Promise<void> {
     try {
       // 使用 MapSpawnManager 获取玩家的野怪列表
-      const ogres = MapSpawnManager.Instance.GetMapOgres(this.UserID, mapId);
+      const ogres = this.Player.MapSpawnManager.GetMapOgres(mapId);
       
       const activeOgres = ogres.filter(o => o.petId > 0);
       
