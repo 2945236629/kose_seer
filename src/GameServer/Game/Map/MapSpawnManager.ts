@@ -81,6 +81,11 @@ export class MapSpawnManager extends BaseManager {
       this.OnEnterMap(mapId);
     }
 
+    Logger.Debug(
+      `[MapSpawnManager] GetMapOgres: userId=${this.UserID}, mapId=${mapId}, ` +
+      `currentMapId=${this._currentMapId}, ogres.length=${this._ogres.length}`
+    );
+
     // 初始化9个空槽位
     const result: Array<{ petId: number; shiny: number; originalPetId: number }> = Array(9)
       .fill(null)
@@ -88,6 +93,11 @@ export class MapSpawnManager extends BaseManager {
 
     // 填充野怪到对应槽位
     for (const ogre of this._ogres) {
+      Logger.Debug(
+        `[MapSpawnManager]   野怪: slot=${ogre.slot}, petId=${ogre.petId}, ` +
+        `shiny=${ogre.shiny}, isVisible=${ogre.isVisible}`
+      );
+      
       if (ogre.isVisible && ogre.slot >= 0 && ogre.slot < 9) {
         result[ogre.slot] = {
           petId: ogre.petId,
@@ -96,6 +106,8 @@ export class MapSpawnManager extends BaseManager {
         };
       }
     }
+
+    Logger.Debug(`[MapSpawnManager] GetMapOgres 返回 ${result.filter(o => o.petId > 0).length} 个野怪`);
 
     return result;
   }

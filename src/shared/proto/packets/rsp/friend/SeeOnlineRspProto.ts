@@ -2,26 +2,25 @@ import { BaseProto } from '../../../base/BaseProto';
 import { CommandID } from '../../../../protocol/CommandID';
 
 /**
- * 在线信息接口
+ * 在线用户信息
  */
 export interface IOnlineInfo {
-  userId: number;
-  serverId: number;
-  mapType: number;
-  mapId: number;
+  userId: number;    // 用户ID
+  serverId: number;  // 服务器ID
+  mapType: number;   // 地图类型
+  mapId: number;     // 地图ID
 }
 
 /**
- * 查看在线状态响应
- * CMD 2157
+ * [CMD: 2157 SEE_ONLINE] 查看在线状态响应
  * 
  * 响应格式:
- * - onlineCount(4)
- * - [OnLineInfo]...
- *   - userID(4)
- *   - serverID(4)
- *   - mapType(4)
- *   - mapID(4)
+ * - onlineCount (uint32) - 在线用户数量
+ * - 对于每个在线用户：
+ *   - userId (uint32) - 用户ID
+ *   - serverId (uint32) - 服务器ID
+ *   - mapType (uint32) - 地图类型
+ *   - mapId (uint32) - 地图ID
  */
 export class SeeOnlineRspProto extends BaseProto {
   public onlineList: IOnlineInfo[] = [];
@@ -30,56 +29,28 @@ export class SeeOnlineRspProto extends BaseProto {
     super(CommandID.SEE_ONLINE);
   }
 
-  public serialize(): Buffer {
-    const onlineCount = this.onlineList.length;
-    const bufferSize = 4 + (onlineCount * 16); // count(4) + [16 bytes per user]
-    const buffer = Buffer.alloc(bufferSize);
-    
-    let offset = 0;
-    
-    // 写入在线数量
-    buffer.writeUInt32BE(onlineCount, offset);
-    offset += 4;
-    
-    // 写入每个在线用户信息
-    for (const info of this.onlineList) {
-      buffer.writeUInt32BE(info.userId, offset);
-      offset += 4;
-      buffer.writeUInt32BE(info.serverId, offset);
-      offset += 4;
-      buffer.writeUInt32BE(info.mapType, offset);
-      offset += 4;
-      buffer.writeUInt32BE(info.mapId, offset);
-      offset += 4;
-    }
-    
-    return buffer;
+  public setOnlineUsers(users: IOnlineInfo[]): void {
+    this.onlineList = users;
   }
 
-  public deserialize(buffer: Buffer): void {
-    let offset = 0;
+  serialize(): Buffer {
+    const buffers: Buffer[] = [];
     
-    if (buffer.length < 4) return;
-    const onlineCount = buffer.readUInt32BE(offset);
-    offset += 4;
+    // onlineCount
+    const countBuf = Buffer.allocUnsafe(4);
+    countBuf.writeUInt32BE(this.onlineList.length, 0);
+    buffers.push(countBuf);
     
-    this.onlineList = [];
-    for (let i = 0; i < onlineCount; i++) {
-      if (offset + 16 <= buffer.length) {
-        this.onlineList.push({
-          userId: buffer.readUInt32BE(offset),
-          serverId: buffer.readUInt32BE(offset + 4),
-          mapType: buffer.readUInt32BE(offset + 8),
-          mapId: buffer.readUInt32BE(offset + 12)
-        });
-        offset += 16;
-      }
+    // 在线用户列表
+    for (const user of this.onlineList) {
+      const userBuf = Buffer.allocUnsafe(16);
+      userBuf.writeUInt32BE(user.userId, 0);
+      userBuf.writeUInt32BE(user.serverId, 4);
+      userBuf.writeUInt32BE(user.mapType, 8);
+      userBuf.writeUInt32BE(user.mapId, 12);
+      buffers.push(userBuf);
     }
-  }
-
-  // 链式调用辅助方法
-  public setOnlineList(onlineList: IOnlineInfo[]): this {
-    this.onlineList = onlineList;
-    return this;
+    
+    return Buffer.concat(buffers);
   }
 }

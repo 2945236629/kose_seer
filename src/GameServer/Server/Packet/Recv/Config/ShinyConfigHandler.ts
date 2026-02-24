@@ -21,7 +21,7 @@ export class ShinyConfigHandler implements IHandler {
       const req = new ShinyConfigReqProto();
       req.deserialize(body);
 
-      Logger.Debug(`[ShinyConfigHandler] 客户端请求异色配置: uid=${player.Uid}, clientVersion=${req.clientVersion}`);
+      Logger.Debug(`[ShinyConfigHandler] 客户端请求异色配置: uid=${player.Uid}`);
 
       // 获取服务端配置版本和数据
       const serverVersion = ShinyConfigManager.Instance.GetVersion();
@@ -30,16 +30,36 @@ export class ShinyConfigHandler implements IHandler {
       // 构造响应
       const rsp = new ShinyConfigRspProto();
       rsp.version = serverVersion;
+      rsp.configs = configs;
 
-      // 如果客户端版本与服务端一致，不发送配置数据（节省带宽）
-      if (req.clientVersion === serverVersion) {
-        Logger.Debug(`[ShinyConfigHandler] 客户端配置已是最新: version=${serverVersion}`);
-        rsp.needUpdate = false;
-      } else {
-        Logger.Debug(`[ShinyConfigHandler] 发送异色配置: version=${serverVersion}, count=${configs.length}`);
-        rsp.needUpdate = true;
-        rsp.configs = configs;
+      // 添加当前地图的野怪异色信息
+      const mapId = player.Data.mapID || 1;
+      const ogres = player.MapSpawnManager.GetMapOgres(mapId);
+      
+      Logger.Debug(`[ShinyConfigHandler] 地图 ${mapId} 野怪列表:`);
+      for (let i = 0; i < ogres.length; i++) {
+        if (ogres[i].petId > 0) {
+          Logger.Debug(
+            `[ShinyConfigHandler]   槽位 ${i}: petId=${ogres[i].petId}, ` +
+            `shiny=${ogres[i].shiny}, originalPetId=${ogres[i].originalPetId}`
+          );
+        }
       }
+      
+      for (let i = 0; i < ogres.length; i++) {
+        if (ogres[i].shiny > 0) {
+          rsp.mapOgres.push({
+            index: i,
+            shinyId: ogres[i].shiny
+          });
+          Logger.Debug(`[ShinyConfigHandler] 添加异色野怪: 槽位=${i}, shinyId=${ogres[i].shiny}`);
+        }
+      }
+
+      Logger.Debug(
+        `[ShinyConfigHandler] 发送异色配置: version=${serverVersion}, ` +
+        `configs=${configs.length}, mapOgres=${rsp.mapOgres.length}`
+      );
 
       // 发送响应
       await player.SendPacket(rsp);

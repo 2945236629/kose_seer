@@ -41,3 +41,6 @@ export * from './User';
 
 // 配置相关Handler
 export * from './Config';
+
+// 房间/家具相关Handler
+export * from './Room';

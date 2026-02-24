@@ -1,38 +1,40 @@
+import { CommandID } from '../../../../protocol';
 import { BaseProto } from '../../../base/BaseProto';
-import { CommandID } from '../../../../protocol/CommandID';
 
 /**
- * 查看在线状态请求
- * CMD 2157
+ * [CMD: 2157 SEE_ONLINE] 查看在线状态请求
  * 
- * 请求格式: count(4) + userIDs[count] (每个4字节)
+ * 请求格式:
+ * - count (uint32) - 用户数量
+ * - userIds (uint32[]) - 用户ID列表
  */
 export class SeeOnlineReqProto extends BaseProto {
-  public userIds: number[] = [];
+  count: number = 0;
+  userIds: number[] = [];
 
   constructor() {
     super(CommandID.SEE_ONLINE);
   }
 
-  public deserialize(buffer: Buffer): void {
-    let offset = 0;
-    
-    // 读取数量
-    if (buffer.length < 4) return;
-    const count = buffer.readUInt32BE(offset);
-    offset += 4;
-    
-    // 读取用户ID列表
-    for (let i = 0; i < count; i++) {
-      if (offset + 4 <= buffer.length) {
-        const userId = buffer.readUInt32BE(offset);
-        this.userIds.push(userId);
-        offset += 4;
-      }
-    }
+  serialize(): Buffer {
+    return Buffer.alloc(0);
   }
 
-  public serialize(): Buffer {
-    return Buffer.alloc(0);
+  static fromBuffer(buffer: Buffer): SeeOnlineReqProto {
+    const proto = new SeeOnlineReqProto();
+    
+    if (buffer.length >= 4) {
+      proto.count = buffer.readUInt32BE(0);
+      proto.userIds = [];
+      
+      for (let i = 0; i < proto.count; i++) {
+        const offset = 4 + i * 4;
+        if (buffer.length >= offset + 4) {
+          proto.userIds.push(buffer.readUInt32BE(offset));
+        }
+      }
+    }
+    
+    return proto;
   }
 }

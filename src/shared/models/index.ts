@@ -3,3 +3,4 @@
  */
 export * from './PlayerModel';
 export * from './PlayerConverter';
+export * from './FitmentModel';

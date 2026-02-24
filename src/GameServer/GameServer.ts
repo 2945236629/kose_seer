@@ -10,7 +10,7 @@ import { RegisterManager } from './Game/Register';
 import { ServerManager } from './Game/Server';
 import { PlayerManager } from './Game/Player/PlayerManager';
 // Note: ItemManager, MapManager, PetManager are now created per-player in PlayerInstance
-import { IHandler } from './Server/Packet/IHandler';
+import { IHandler, SessionType } from './Server/Packet/IHandler';
 import { DatabaseManager } from '../DataBase';
 import { DatabaseHelper } from '../DataBase/DatabaseHelper';
 
@@ -103,10 +103,13 @@ export class GameServer {
       });
 
       socket.on('close', async () => {
-        // 如果玩家已登录，需要清理玩家实例
-        if (session.UserID > 0) {
+        // 只有主连接断开时才登出玩家
+        // 房间连接断开不应该触发登出
+        if (session.UserID > 0 && session.Type === SessionType.MAIN) {
           Logger.Info(`[GameServer] 玩家断开连接: UserID=${session.UserID}, Address=${session.Address}`);
           await PlayerManager.GetInstance().RemovePlayer(session.UserID);
+        } else if (session.UserID > 0 && session.Type === SessionType.ROOM) {
+          Logger.Info(`[GameServer] 房间连接断开: UserID=${session.UserID}, Address=${session.Address}`);
         }
         this._sessionManager.RemoveSession(session.Address);
       });

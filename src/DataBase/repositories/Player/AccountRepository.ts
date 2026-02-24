@@ -49,17 +49,27 @@ export class AccountRepository extends BaseRepository<IAccountRow> {
 
   /**
    * 创建账号
+   * 用户ID从 100000000 开始
    */
   public async CreateAccount(email: string, passwordHash: string): Promise<number> {
     const now = Math.floor(Date.now() / 1000);
 
+    // 获取当前最大ID
+    const maxIdRows = await this._db.Query<{ maxId: number }>(
+      'SELECT COALESCE(MAX(id), 99999999) as maxId FROM accounts'
+    );
+    const maxId = maxIdRows[0]?.maxId || 99999999;
+    
+    // 新用户ID = max(当前最大ID + 1, 100000000)
+    const newUserId = Math.max(maxId + 1, 100000000);
+
     const result = await this._db.Execute(
-      `INSERT INTO accounts (email, password_hash, status, create_time, last_login_time, last_login_ip, role_created)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [email, passwordHash, AccountStatus.NORMAL, now, 0, '', 0]
+      `INSERT INTO accounts (id, email, password_hash, status, create_time, last_login_time, last_login_ip, role_created)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newUserId, email, passwordHash, AccountStatus.NORMAL, now, 0, '', 0]
     );
 
-    return result.insertId;
+    return newUserId;
   }
 
   /**

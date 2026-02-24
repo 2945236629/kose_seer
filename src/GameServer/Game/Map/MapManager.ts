@@ -45,10 +45,17 @@ export class MapManager extends BaseManager {
    * 处理进入地图
    */
   public async HandleEnterMap(req: EnterMapReqProto): Promise<void> {
-    const mapId = req.mapId || 1;
+    let mapId = req.mapId || 1;
     const mapType = req.mapType;
     const x = req.x || 500;
     const y = req.y || 300;
+
+    // 特殊处理：如果 mapId == userId，说明是访问家园
+    // 将家园地图ID改为 99999 + userId（避免与普通地图ID冲突）
+    if (mapId === this.UserID) {
+      mapId = this.UserID;
+      Logger.Debug(`[MapManager] 检测到家园访问请求 (mapId == userId)，转换为家园地图ID: ${mapId}`);
+    }
 
     Logger.Info(`[MapManager] ========== 玩家 ${this.UserID} 进入地图 ==========`);
     Logger.Info(`[MapManager] MapID: ${mapId}, MapType: ${mapType}, Pos: (${x}, ${y})`);

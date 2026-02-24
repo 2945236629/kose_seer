@@ -1,6 +1,6 @@
 import { Socket } from 'net';
 import { PacketParser } from '../../../shared/protocol';
-import { IClientSession } from '../Packet/IHandler';
+import { IClientSession, SessionType } from '../Packet/IHandler';
 import { Logger } from '../../../shared/utils';
 import { CryptoHandler } from '../../../shared/crypto';
 
@@ -37,6 +37,7 @@ export class SessionManager {
       PolicyHandled: false,
       Crypto: new CryptoHandler(),
       EncryptionEnabled: false,
+      Type: SessionType.MAIN, // 默认为主连接
     };
 
     this._sessions.set(address, session);

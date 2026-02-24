@@ -7,25 +7,27 @@ import { IShinyConfigItem } from '../../../../config/game/interfaces/IShinyConfi
  * 异色配置响应
  * CMD 109001
  * 
- * 协议格式（与 ShinyConfig.as 匹配）：
+ * 协议格式：
  * - uint32: version (配置版本号)
- * - boolean: needUpdate (是否需要更新，如果客户端版本一致则为 false)
- * - uint16: count (配置数量，仅当 needUpdate=true 时有效)
+ * - uint16: count (配置数量)
  * - 对于每个配置：
  *   - uint32: shinyId
  *   - UTF: name
- *   - UTF: description
+ *   - boolean: enabled
  *   - 20 个 float: colorMatrix
- *   - UTF: glowColor (如 "0xFFD700")
+ *   - uint32: glowColor (颜色值，如 0xFFD700)
  *   - float: glowAlpha
  *   - float: glowBlur
  *   - float: glowStrength
- *   - UTF: petOverrides (JSON 字符串)
+ * - uint16: mapOgreCount (当前地图野怪数量，最多 9 个)
+ * - 对于每个野怪：
+ *   - uint8: index (槽位索引 0-8)
+ *   - uint32: shinyId (异色ID，0=无异色)
  */
 export class ShinyConfigRspProto extends BaseProto {
   public version: number = 0;
-  public needUpdate: boolean = true;
   public configs: IShinyConfigItem[] = [];
+  public mapOgres: Array<{ index: number; shinyId: number }> = [];
 
   constructor() {
     super(CommandID.SHINY_CONFIG_GET);
@@ -41,14 +43,6 @@ export class ShinyConfigRspProto extends BaseProto {
     // 写入版本号
     writer.WriteUInt32(this.version);
 
-    // 写入是否需要更新
-    writer.WriteBoolean(this.needUpdate);
-
-    if (!this.needUpdate) {
-      // 客户端配置已是最新，不发送配置数据
-      return writer.ToBuffer();
-    }
-
     // 写入配置数量
     writer.WriteUInt16(this.configs.length);
 
@@ -60,8 +54,8 @@ export class ShinyConfigRspProto extends BaseProto {
       // name
       writer.WriteUTF(config.name);
 
-      // description
-      writer.WriteUTF(config.description || '');
+      // enabled
+      writer.WriteBoolean(config.enabled);
 
       // colorMatrix (20 个 float)
       if (config.colorMatrix && config.colorMatrix.length === 20) {
@@ -81,9 +75,10 @@ export class ShinyConfigRspProto extends BaseProto {
         }
       }
 
-      // glow.color (转换为字符串格式 "0xFFD700")
-      const glowColor = config.glow?.color || '0xFFD700';
-      writer.WriteUTF(glowColor);
+      // glow.color (解析为数字)
+      const glowColorStr = config.glow?.color || '0xFFD700';
+      const glowColor = parseInt(glowColorStr.replace('0x', ''), 16);
+      writer.WriteUInt32(glowColor);
 
       // glow.alpha
       writer.WriteFloat(config.glow?.alpha ?? 0.8);
@@ -93,10 +88,13 @@ export class ShinyConfigRspProto extends BaseProto {
 
       // glow.strength
       writer.WriteFloat(config.glow?.strength ?? 2);
+    }
 
-      // petOverrides (JSON 字符串)
-      const overridesJson = config.petOverrides ? JSON.stringify(config.petOverrides) : '';
-      writer.WriteUTF(overridesJson);
+    // 写入当前地图野怪异色信息
+    writer.WriteUInt16(this.mapOgres.length);
+    for (const ogre of this.mapOgres) {
+      writer.WriteUInt8(ogre.index);
+      writer.WriteUInt32(ogre.shinyId);
     }
 
     return writer.ToBuffer();
