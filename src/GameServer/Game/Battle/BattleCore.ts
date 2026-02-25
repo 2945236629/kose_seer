@@ -7,11 +7,7 @@
 
 import { Logger } from "../../../shared/utils";
 import {
-  IBattleInfo,
   IBattlePet,
-  IAttackResult,
-  ITurnResult,
-  BattleStatus,
 } from "../../../shared/models/BattleModel";
 import { BattleAlgorithm, SkillCategory } from "./BattleAlgorithm";
 import { ISkillConfig } from "../../../shared/models/SkillModel";
@@ -55,38 +51,6 @@ export interface ICannotActReason {
  * 战斗核心类
  */
 export class BattleCore {
-  /**
-   * 同步状态数组
-   * 当设置 pet.status 时，同步更新 pet.statusArray 以便客户端显示
-   *
-   * @deprecated 推荐使用 createBattlePetProxy() 自动同步，此方法作为后备方案
-   * @param pet 精灵对象
-   */
-  public static SyncStatusArray(pet: IBattlePet): void {
-    // 初始化 statusArray（20个元素，对应所有可能的状态）
-    if (!pet.statusArray) {
-      pet.statusArray = new Array(20).fill(0);
-    }
-
-    // 清空所有状态
-    pet.statusArray.fill(0);
-
-    // 如果有主要状态，设置对应位置的持续时间
-    if (pet.status !== undefined && pet.status >= 0) {
-      const duration = pet.statusTurns || 3;
-      pet.statusArray[pet.status] = duration;
-    }
-
-    // 如果有 statusDurations 数组，同步所有状态
-    if (pet.statusDurations && pet.statusDurations.length > 0) {
-      for (let i = 0; i < Math.min(pet.statusDurations.length, 20); i++) {
-        if (pet.statusDurations[i] > 0) {
-          pet.statusArray[i] = pet.statusDurations[i];
-        }
-      }
-    }
-  }
-
   // ==================== 状态效果处理 ====================
 
   /**
@@ -209,71 +173,6 @@ export class BattleCore {
     }
 
     return { canAct: true };
-  }
-
-  /**
-   * 应用状态效果
-   */
-  public static ApplyStatus(
-    target: IBattlePet,
-    statusType: BattleStatusType,
-    duration: number,
-  ): void {
-    // 免疫异常状态检查（由 PassiveEffectRunner 在初始化时设置 immuneFlags）
-    if (target.immuneFlags?.status) {
-      Logger.Debug(`[BattleCore] ${target.name} 免疫异常状态: ${statusType}`);
-      return;
-    }
-
-    if (!target.statusDurations) {
-      target.statusDurations = new Array(20).fill(0);
-    }
-    target.statusDurations[statusType] = duration;
-
-    // 同时更新主要状态显示
-    target.status = statusType as unknown as BattleStatus;
-    target.statusTurns = duration;
-  }
-
-  /**
-   * 应用能力等级变化
-   *
-   * @param target 目标精灵
-   * @param statIndex 能力索引（0-5）
-   * @param change 变化值（正数提升，负数下降）
-   * @returns 是否成功应用
-   */
-  public static ApplyStatChange(
-    target: IBattlePet,
-    statIndex: number,
-    change: number,
-  ): boolean {
-    // 免疫能力下降检查（由 PassiveEffectRunner 在初始化时设置 immuneFlags）
-    if (change < 0 && target.immuneFlags?.statDown) {
-      const statNames = ["攻击", "防御", "特攻", "特防", "速度", "命中"];
-      Logger.Debug(
-        `[BattleCore] ${target.name} 免疫能力下降: ${statNames[statIndex]} ${change}`,
-      );
-      return false;
-    }
-
-    // 初始化 battleLv
-    if (!target.battleLv) {
-      target.battleLv = [0, 0, 0, 0, 0, 0];
-    }
-
-    // 应用能力等级变化（限制在 -6 到 +6 之间）
-    const oldLevel = target.battleLv[statIndex] || 0;
-    const newLevel = Math.max(-6, Math.min(6, oldLevel + change));
-    target.battleLv[statIndex] = newLevel;
-
-    const statNames = ["攻击", "防御", "特攻", "特防", "速度", "命中"];
-    Logger.Debug(
-      `[BattleCore] 能力变化: ${target.name}, ${statNames[statIndex]} ` +
-        `${oldLevel} → ${newLevel} (${change >= 0 ? "+" : ""}${change})`,
-    );
-
-    return true;
   }
 
   // ==================== 命中和暴击判定 ====================
@@ -575,24 +474,4 @@ export class BattleCore {
     );
   }
 
-  /**
-   * 调试：打印精灵的battleLv状态
-   */
-  public static DebugBattleLv(pet: IBattlePet, label: string): void {
-    const statNames = ["攻击", "防御", "特攻", "特防", "速度", "命中"];
-    const levels = pet.battleLv || [];
-    const levelsStr = levels
-      .map((lv, i) => `${statNames[i]}:${lv || 0}`)
-      .join(", ");
-    Logger.Debug(`[BattleCore] ${label} battleLv: [${levelsStr}]`);
-  }
-
-  // ==================== 日志 ====================
-
-  /**
-   * 记录战斗日志
-   */
-  public static LogBattle(message: string): void {
-    Logger.Info(`[BattleCore] ${message}`);
-  }
 }

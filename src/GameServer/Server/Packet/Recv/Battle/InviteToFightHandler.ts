@@ -61,7 +61,7 @@ export class InviteToFightHandler implements IHandler {
       const targetNick = targetSession.Player.Data.nick || `Player${targetId}`;
 
       // 检查邀请者是否有健康的精灵
-      const inviterPets = player.PetManager.PetData.GetPetsInBag();
+      const inviterPets = player.PetManager.GetPetsInBag();
       const inviterHealthyPets = inviterPets.filter((p: any) => p.hp > 0);
       if (inviterHealthyPets.length === 0) {
         await player.SendPacket(new PacketEmpty(CommandID.INVITE_TO_FIGHT).setResult(10017));
@@ -70,7 +70,7 @@ export class InviteToFightHandler implements IHandler {
       }
 
       // 检查目标玩家是否有健康的精灵
-      const targetPets = targetSession.Player.PetManager.PetData.GetPetsInBag();
+      const targetPets = targetSession.Player.PetManager.GetPetsInBag();
       const targetHealthyPets = targetPets.filter((p: any) => p.hp > 0);
       if (targetHealthyPets.length === 0) {
         // 发送成功确认给邀请者

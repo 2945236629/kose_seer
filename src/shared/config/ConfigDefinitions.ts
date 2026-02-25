@@ -33,6 +33,7 @@ export const ConfigKeys = {
   SKILL_EFFECTS_V2: 'skill_effects_v2',
   PET_ABILITIES: 'pet_abilities',
   BOSS_ABILITIES: 'boss_abilities',
+  GACHA_REWARDS: 'gacha_rewards',
 } as const;
 
 /**
@@ -65,6 +66,7 @@ export const ConfigPaths: Record<string, string> = {
   [ConfigKeys.SKILL_EFFECTS_V2]: 'data/json/skill_effects_v2.json',
   [ConfigKeys.PET_ABILITIES]: 'data/json/pet_abilities.json',
   [ConfigKeys.BOSS_ABILITIES]: 'data/json/boss_abilities.json',
+  [ConfigKeys.GACHA_REWARDS]: 'data/json/gacha_rewards.json',
 };
 
 /**
@@ -101,6 +103,7 @@ export const ConfigTypes: Record<string, ConfigType> = {
   [ConfigKeys.SKILL_EFFECTS_V2]: ConfigType.JSON,
   [ConfigKeys.PET_ABILITIES]: ConfigType.JSON,
   [ConfigKeys.BOSS_ABILITIES]: ConfigType.JSON,
+  [ConfigKeys.GACHA_REWARDS]: ConfigType.JSON,
 };
 
 /**
@@ -124,7 +127,7 @@ export function GetGameConfigRegistrations(): Array<{ key: string; path: string;
     { key: ConfigKeys.UNIQUE_ITEMS_CONFIG, path: ConfigPaths[ConfigKeys.UNIQUE_ITEMS_CONFIG], type: ConfigTypes[ConfigKeys.UNIQUE_ITEMS_CONFIG] },
     { key: ConfigKeys.SKILL_EFFECTS_V2, path: ConfigPaths[ConfigKeys.SKILL_EFFECTS_V2], type: ConfigTypes[ConfigKeys.SKILL_EFFECTS_V2] },
     { key: ConfigKeys.PET_ABILITIES, path: ConfigPaths[ConfigKeys.PET_ABILITIES], type: ConfigTypes[ConfigKeys.PET_ABILITIES] },
-    { key: ConfigKeys.BOSS_ABILITIES, path: ConfigPaths[ConfigKeys.BOSS_ABILITIES], type: ConfigTypes[ConfigKeys.BOSS_ABILITIES] }
-    //{ key: ConfigKeys.BATTLE_CONFIG, path: ConfigPaths[ConfigKeys.BATTLE_CONFIG], type: ConfigTypes[ConfigKeys.BATTLE_CONFIG] },
+    { key: ConfigKeys.BOSS_ABILITIES, path: ConfigPaths[ConfigKeys.BOSS_ABILITIES], type: ConfigTypes[ConfigKeys.BOSS_ABILITIES] },
+    { key: ConfigKeys.GACHA_REWARDS, path: ConfigPaths[ConfigKeys.GACHA_REWARDS], type: ConfigTypes[ConfigKeys.GACHA_REWARDS] }
   ];
 }

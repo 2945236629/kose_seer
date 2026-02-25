@@ -4,6 +4,7 @@ import { IBattleInfo } from '../../../../shared/models/BattleModel';
 import { GameConfig } from '../../../../shared/config/game/GameConfig';
 import { BossAbilityConfig } from '../BossAbility/BossAbilityConfig';
 import { BossSpecialRules } from '../BossSpecialRules';
+import { ItemGainSource, PetObtainSource } from '../../Event/EventTypes';
 
 /**
  * 战斗奖励服务
@@ -48,7 +49,7 @@ export class BattleRewardService {
       // 3. 给精灵增加经验（使用catchTime查找精灵）
       const catchTime = battle.player.catchTime;
       const levelUp = await this._player.PetManager.HandleAddPetExpByCatchTime(catchTime, expGained);
-      const pet = this._player.PetManager.PetData.GetPetByCatchTime(catchTime);
+      const pet = this._player.PetManager.GetPetByCatchTime(catchTime);
       const newLevel = pet ? pet.level : battle.player.level;
 
       // 4. 给玩家增加金币
@@ -57,7 +58,7 @@ export class BattleRewardService {
       // 5. 处理掉落物品（使用originalPetId查找配置，如果没有则使用当前petId）
       const droppedItems = this.ProcessDropItems(mapId, slot, originalPetId || battle.enemy.id);
       for (const drop of droppedItems) {
-        this._player.ItemManager.ItemData.AddItem(drop.itemId, drop.count, 0);
+        await this._player.ItemManager.GiveItem(drop.itemId, drop.count, ItemGainSource.DROP);
         Logger.Info(`[BattleRewardService] 掉落物品已添加到背包: ItemId=${drop.itemId}, Count=${drop.count}`);
       }
 
@@ -166,7 +167,7 @@ export class BattleRewardService {
     // 奖励精灵
     if (sptInfo.rewardPetId && sptInfo.rewardPetId > 0) {
       const catchTime = Math.floor(Date.now() / 1000);
-      const success = await this._player.PetManager.GivePet(sptInfo.rewardPetId, 1, catchTime);
+      const success = await this._player.PetManager.GivePet(sptInfo.rewardPetId, 1, catchTime, PetObtainSource.BATTLE_REWARD);
       if (success) {
         Logger.Info(`[BattleRewardService] SPT奖励精灵已发放: PetId=${sptInfo.rewardPetId}`);
         // 注意：精灵奖励不添加到rewardItems，因为客户端会通过精灵列表更新显示
@@ -175,7 +176,7 @@ export class BattleRewardService {
 
     // 奖励物品
     if (sptInfo.rewardItemId && sptInfo.rewardItemId > 0) {
-      this._player.ItemManager.ItemData.AddItem(sptInfo.rewardItemId, 1, 0);
+      await this._player.ItemManager.GiveItem(sptInfo.rewardItemId, 1, ItemGainSource.DROP);
       rewards.push({ itemId: sptInfo.rewardItemId, count: 1 });
       Logger.Info(`[BattleRewardService] SPT奖励物品已发放: ItemId=${sptInfo.rewardItemId}`);
     }
@@ -215,7 +216,7 @@ export class BattleRewardService {
       }
 
       // 使用 PetManager 的 GivePet 方法
-      const success = await this._player.PetManager.GivePet(battle.enemy.id, battle.enemy.level, catchTime);
+      const success = await this._player.PetManager.GivePet(battle.enemy.id, battle.enemy.level, catchTime, PetObtainSource.CATCH);
 
       if (success) {
         Logger.Info(`[BattleRewardService] 捕获精灵: UserID=${userId}, PetId=${battle.enemy.id}, Level=${battle.enemy.level}, CatchTime=${catchTime}`);

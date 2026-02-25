@@ -30,6 +30,7 @@ import { PacketPetOneCure } from '../../Server/Packet/Send/Pet/PacketPetOneCure'
 import { PacketGetPetSkill } from '../../Server/Packet/Send/Pet/PacketGetPetSkill';
 import { PacketPetRoomList } from '../../Server/Packet/Send/Pet/PacketPetRoomList';
 import { PacketSkillSort } from '../../Server/Packet/Send/Pet/PacketSkillSort';
+import { PetEventType, IPetObtainedEvent, IPetEvolutionEvent, PetObtainSource } from '../Event/EventTypes';
 /**
  * 精灵管理器
  * 处理精灵相关的所有逻辑：获取精灵信息、精灵列表、治疗、展示等
@@ -488,6 +489,29 @@ export class PetManager extends BaseManager {
     PetCalculator.UpdatePetStats(pet);
   }
 
+  // ==================== 公开 API（外部 Manager/Handler 必须通过这些方法访问） ====================
+
+  /**
+   * 获取背包中的精灵列表（按首发优先、catchTime升序排列）
+   */
+  public GetPetsInBag(): IPetInfo[] {
+    return this.PetData.GetPetsInBag();
+  }
+
+  /**
+   * 获取首发精灵
+   */
+  public GetDefaultPet(): IPetInfo | null {
+    return this.PetData.PetList.find(p => p.isDefault) || null;
+  }
+
+  /**
+   * 按 catchTime 获取精灵
+   */
+  public GetPetByCatchTime(catchTime: number): IPetInfo | null {
+    return this.PetData.GetPetByCatchTime(catchTime);
+  }
+
   /**
    * 获取精灵数量信息
    */
@@ -506,7 +530,7 @@ export class PetManager extends BaseManager {
   /**
    * Give pet to player (for mail attachments, task rewards, etc.)
    */
-  public async GivePet(petId: number, level: number = 1, catchTime?: number): Promise<boolean> {
+  public async GivePet(petId: number, level: number = 1, catchTime?: number, source: PetObtainSource = PetObtainSource.GIVE): Promise<boolean> {
     try {
       Logger.Info(`[PetManager] GivePet 开始: UserId=${this.UserID}, PetId=${petId}, Level=${level}, CatchTime=${catchTime}`);
       
@@ -542,22 +566,23 @@ export class PetManager extends BaseManager {
         Logger.Info(`[PetManager] 背包满，将精灵放入仓库: UserId=${this.UserID}, PetId=${petId}`);
       }
       
-      // Add to bag or storage
-      Logger.Debug(`[PetManager] 添加前 PetList 长度: ${this.PetData.PetList.length}`);
-      Logger.Debug(`[PetManager] PetData 对象 Uid: ${this.PetData.Uid}`);
-      Logger.Debug(`[PetManager] PetData 对象引用: ${typeof this.PetData}`);
-      
       await this.PetData.AddPet(newPet);
-      
-      Logger.Debug(`[PetManager] 添加后 PetList 长度: ${this.PetData.PetList.length}`);
-      Logger.Debug(`[PetManager] PetList 内容: ${JSON.stringify(this.PetData.PetList.map(p => ({ petId: p.petId, catchTime: p.catchTime })))}`);
-      Logger.Debug(`[PetManager] 准备保存的 PetData.Uid: ${this.PetData.Uid}`);
-      Logger.Debug(`[PetManager] 准备保存的 PetData.PetList.length: ${this.PetData.PetList.length}`);
-      
       Logger.Info(`[PetManager] 准备保存精灵数据到数据库...`);
       await DatabaseHelper.Instance.SavePetData(this.PetData);
       
       Logger.Info(`[PetManager] Give pet success UserId=${this.UserID}, PetId=${petId}, Level=${level}, Skills=${newPet.skillArray.join(',')}`);
+
+      // 派发精灵获得事件
+      await this.Player.EventBus.Emit({
+        type: PetEventType.PET_OBTAINED,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        petId,
+        level,
+        catchTime: newPet.catchTime,
+        source,
+      } as IPetObtainedEvent);
+
       return true;
     } catch (error) {
       Logger.Error(`[PetManager] Give pet error`, error as Error);
@@ -872,6 +897,17 @@ export class PetManager extends BaseManager {
         await this.sendNoteUpdateSkill(pet, newSkills);
         Logger.Info(`[PetManager] 推送 NOTE_UPDATE_SKILL: PetId=${pet.petId}, NewSkills=[${newSkills.join(', ')}]`);
       }
+
+      // 11. 派发精灵进化事件
+      await this.Player.EventBus.Emit({
+        type: PetEventType.PET_EVOLUTION,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        oldPetId: oldPetId,
+        newPetId: evolvesTo,
+        level: pet.level,
+        catchTime: pet.catchTime,
+      } as IPetEvolutionEvent);
     } catch (error) {
       Logger.Error(`[PetManager] HandlePetEvolution failed`, error as Error);
       await this.Player.SendPacket(new PacketEmpty(CommandID.PET_EVOLVTION).setResult(5000));
@@ -882,9 +918,9 @@ export class PetManager extends BaseManager {
    * 处理精灵学习技能（替换技能）
    * @param catchTime 精灵捕获时间
    * @param skillId 要学习的技能ID
-   * @param slotIndex 要替换的技能槽位置 (0-3)
+   * @param dropSkillId 要替换的旧技能ID
    */
-  public async HandleStudySkill(catchTime: number, skillId: number, slotIndex: number): Promise<void> {
+  public async HandleStudySkill(catchTime: number, skillId: number, dropSkillId: number): Promise<void> {
     try {
       // 1. 验证精灵存在
       const pet = this.PetData.GetPetByCatchTime(catchTime);
@@ -894,9 +930,10 @@ export class PetManager extends BaseManager {
         return;
       }
 
-      // 2. 验证技能槽位置有效 (0-3)
-      if (slotIndex < 0 || slotIndex > 3) {
-        Logger.Warn(`[PetManager] 技能槽位置无效: UserID=${this.UserID}, SlotIndex=${slotIndex}`);
+      // 2. 查找要替换的技能槽位置
+      const slotIndex = pet.skillArray.indexOf(dropSkillId);
+      if (slotIndex === -1) {
+        Logger.Warn(`[PetManager] 旧技能不存在: UserID=${this.UserID}, DropSkillId=${dropSkillId}, SkillArray=[${pet.skillArray.join(',')}]`);
         await this.Player.SendPacket(new PacketEmpty(CommandID.PET_STUDY_SKILL).setResult(5001));
         return;
       }

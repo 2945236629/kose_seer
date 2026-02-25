@@ -23,15 +23,17 @@ import {
 } from '../../Server/Packet/Send';
 import { PacketChangeCloth } from '../../Server/Packet/Send/Item/PacketChangeCloth';
 import { BossAbilityConfig } from '../Battle/BossAbility/BossAbilityConfig';
+import { GameEventBus } from '../Event/GameEventBus';
+import { IPlayerLogoutEvent, PlayerEventType } from '../Event/EventTypes';
 
 /**
  * 地图管理器
  * 处理地图相关的所有逻辑：进入、离开地图、玩家移动、聊天等
  * 
- * 重构说明�?
+ * 重构说明：
  * - 从全局单例改为 Player 实例 Manager
  * - 继承 BaseManager 获得便捷方法
- * - 不再需要传�?userId 参数
+ * - 不再需要传 userId 参数
  */
 export class MapManager extends BaseManager {
   private _onlineTracker: OnlineTracker;
@@ -41,6 +43,14 @@ export class MapManager extends BaseManager {
     super(player);
     this._onlineTracker = OnlineTracker.Instance;
     this._playerRepo = new PlayerRepository(); // 保留用于查询其他玩家
+  }
+  public RegisterEvents(eventBus: GameEventBus): void {
+    // Keep old cleanup order: map leave should happen before battle cleanup.
+    eventBus.On<IPlayerLogoutEvent>(PlayerEventType.LOGOUT, this.OnPlayerLogout.bind(this), 10);
+  }
+
+  private async OnPlayerLogout(_event: IPlayerLogoutEvent): Promise<void> {
+    await this.HandleLeaveMap();
   }
 
   /**
@@ -460,8 +470,8 @@ export class MapManager extends BaseManager {
     
     // 精灵信息 - 从正确的玩家精灵数据获取
     let defaultPet = null;
-    if (playerInstance?.PetManager?.PetData) {
-      defaultPet = playerInstance.PetManager.PetData.PetList.find(p => p.isDefault);
+    if (playerInstance?.PetManager) {
+      defaultPet = playerInstance.PetManager.GetDefaultPet();
     }
     userInfo.spiritTime = defaultPet?.catchTime || 0;
     userInfo.spiritID = defaultPet?.petId || 0;

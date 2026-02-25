@@ -8,6 +8,10 @@ import { OnlineTracker } from '../Player/OnlineTracker';
 import { ItemSystem } from './ItemSystem';
 import { ItemData } from '../../../DataBase/models/ItemData';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
+import { ItemEventType, IItemGainedEvent, ItemGainSource } from '../Event/EventTypes';
+import { PacketGoldBuyProduct } from '../../Server/Packet/Send/User/PacketGoldBuyProduct';
+import { PacketEmpty } from '../../Server/Packet/Send/PacketEmpty';
+import { CommandID } from '../../../shared/protocol/CommandID';
 
 /**
  * 物品管理器
@@ -99,6 +103,16 @@ export class ItemManager extends BaseManager {
     // 发送成功响应（result = 0）
     await this.Player.SendPacket(new PacketItemBuy(playerData.coins, itemId, count, 0));
     Logger.Info(`[ItemManager] 玩家 ${this.UserID} 购买物品 ${itemId} x${count}, 剩余金币 ${playerData.coins}`);
+
+    // 派发物品获得事件
+    await this.Player.EventBus.Emit({
+      type: ItemEventType.ITEM_GAINED,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      itemId,
+      count,
+      source: ItemGainSource.BUY,
+    } as IItemGainedEvent);
   }
 
   /**
@@ -108,7 +122,7 @@ export class ItemManager extends BaseManager {
    * @param count 数量
    * @returns 是否成功
    */
-  public async GiveItem(itemId: number, count: number): Promise<boolean> {
+  public async GiveItem(itemId: number, count: number, source: ItemGainSource = ItemGainSource.GIVE): Promise<boolean> {
     try {
       // 调试日志
       Logger.Debug(`[ItemManager] GiveItem 开始: UserId=${this.UserID}, ItemId=${itemId}, Count=${count}, ItemData.Uid=${this.ItemData?.Uid}`);
@@ -131,11 +145,64 @@ export class ItemManager extends BaseManager {
       }
       
       Logger.Info(`[ItemManager] 赠送物品成功: UserId=${this.UserID}, ItemId=${itemId}, Count=${count}`);
+
+      // 派发物品获得事件
+      await this.Player.EventBus.Emit({
+        type: ItemEventType.ITEM_GAINED,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        itemId,
+        count,
+        source,
+      } as IItemGainedEvent);
+
       return true;
     } catch (error) {
       Logger.Error(`[ItemManager] 赠送物品异常: ${error}`);
       return false;
     }
+  }
+
+  // ==================== 公开查询/操作 API ====================
+
+  /**
+   * 检查玩家是否拥有某物品
+   */
+  public HasItem(itemId: number): boolean {
+    return this.ItemData.HasItem(itemId);
+  }
+
+  /**
+   * 获取某物品的数量
+   */
+  public GetItemCount(itemId: number): number {
+    const item = this.ItemData.ItemList.find(i => i.itemId === itemId);
+    return item ? item.count : 0;
+  }
+
+  /**
+   * 消耗物品
+   * @returns 是否成功消耗
+   */
+  public ConsumeItem(itemId: number, count: number): boolean {
+    const item = this.ItemData.ItemList.find(i => i.itemId === itemId);
+    if (!item || item.count < count) return false;
+
+    item.count -= count;
+    if (item.count <= 0) {
+      this.ItemData.ItemList = this.ItemData.ItemList.filter(i => i.itemId !== itemId);
+    }
+    Logger.Info(`[ItemManager] 消耗物品: UserId=${this.UserID}, ItemId=${itemId}, Count=${count}, Remaining=${item.count}`);
+    return true;
+  }
+
+  /**
+   * 获取服装物品列表（ID >= 100000 且 < 200000）
+   */
+  public GetClothItems(): Array<{ itemId: number; count: number }> {
+    return this.ItemData.ItemList
+      .filter(item => item.itemId >= 100000 && item.itemId < 200000)
+      .map(item => ({ itemId: item.itemId, count: item.count }));
   }
 
   /**
@@ -233,6 +300,93 @@ export class ItemManager extends BaseManager {
     // 发送响应
     await this.Player.SendPacket(new PacketItemList(filteredItems));
     Logger.Info(`[ItemManager] 玩家 ${this.UserID} 物品列表响应，共 ${filteredItems.length} 个物品`);
+  }
+
+  /**
+   * 处理金豆购买商品
+   * @param productId 商品ID
+   * @param count 购买数量
+   */
+  public async HandleGoldBuyProduct(productId: number, count: number): Promise<void> {
+    try {
+      // 验证数量
+      if (count <= 0) {
+        Logger.Warn(`[ItemManager] 金豆购买数量无效: Count=${count}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(5001));
+        return;
+      }
+
+      // 获取商品配置
+      const product = GameConfig.GetProductById(productId);
+      if (!product) {
+        Logger.Warn(`[ItemManager] 商品不存在: ProductId=${productId}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(5001));
+        return;
+      }
+
+      // 验证物品存在（如果商品关联了物品）
+      if (product.itemID > 0 && !ItemSystem.Exists(product.itemID)) {
+        Logger.Warn(`[ItemManager] 商品关联的物品不存在: ItemId=${product.itemID}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(5001));
+        return;
+      }
+
+      // 检查唯一性物品
+      if (product.itemID > 0 && ItemSystem.IsUniqueItem(product.itemID)) {
+        if (this.HasItem(product.itemID)) {
+          Logger.Warn(`[ItemManager] 唯一物品已拥有: ItemId=${product.itemID}`);
+          await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(103203));
+          return;
+        }
+      }
+
+      // 检查是否VIP
+      const isVip = this.Player.Data.vip > 0;
+
+      // 计算价格（考虑VIP折扣）
+      let unitPrice = product.price;
+      if (isVip && product.vip > 0 && product.vip < 1) {
+        unitPrice = Math.floor(product.price * product.vip);
+      }
+      const totalCost = unitPrice * count;
+
+      // 检查金豆是否足够
+      const currentGold = this.Player.Data.gold || 0;
+      if (currentGold < totalCost) {
+        Logger.Warn(`[ItemManager] 金豆不足: 需要=${totalCost}, 拥有=${currentGold}`);
+        await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(10016));
+        return;
+      }
+
+      // 扣除金豆
+      this.Player.Data.gold = currentGold - totalCost;
+
+      // 添加物品
+      if (product.itemID > 0) {
+        await this.GiveItem(product.itemID, count, ItemGainSource.GOLD_BUY);
+        Logger.Info(`[ItemManager] 金豆购买添加物品: ItemId=${product.itemID}, Count=${count}`);
+      }
+
+      // 赠送赛尔豆（配置中的 gold 字段表示赠送的赛尔豆数量）
+      if (product.gold > 0) {
+        const giftCoins = product.gold * count;
+        this.Player.Data.coins += giftCoins;
+        Logger.Info(`[ItemManager] 金豆购买赠送赛尔豆: ${giftCoins}, 新余额=${this.Player.Data.coins}`);
+      }
+
+      // 发送成功响应
+      await this.Player.SendPacket(new PacketGoldBuyProduct(totalCost, this.Player.Data.gold || 0));
+
+      Logger.Info(
+        `[ItemManager] 金豆购买成功: UserID=${this.UserID}, ` +
+        `ProductId=${productId}, ItemId=${product.itemID}, Count=${count}, ` +
+        `UnitPrice=${unitPrice}, TotalCost=${totalCost}, CoinsGift=${product.gold * count}, ` +
+        `RemainingGold=${this.Player.Data.gold}, VIP=${isVip}, Discount=${isVip && product.vip ? product.vip : 1}`
+      );
+    } catch (error) {
+      Logger.Error(`[ItemManager] HandleGoldBuyProduct 处理失败`, error as Error);
+      await this.Player.SendPacket(new PacketEmpty(CommandID.GOLD_BUY_PRODUCT).setResult(5000));
+    }
   }
 
   /**

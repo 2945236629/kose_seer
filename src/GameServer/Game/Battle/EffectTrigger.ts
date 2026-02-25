@@ -21,7 +21,7 @@ import { EffectTiming, createEffectContext, IEffectResult } from './effects/core
 import { SkillEffectsConfig } from '../../../shared/config/game/SkillEffectsConfig';
 import { AtomicEffectFactory } from './effects/atomic/core/AtomicEffectFactory';
 import { IAtomicEffectParams } from './effects/atomic/core/IAtomicEffect';
-import { BossRules } from './BossRules';
+import { EffectApplicator } from './EffectApplicator';
 
 /**
  * 效果触发器类
@@ -379,237 +379,21 @@ export class EffectTrigger {
   }
 
   /**
-   * 应用效果结果到战斗精灵
-   * 
-   * @param results 效果结果数组
-   * @param attacker 攻击方
-   * @param defender 防守方
+   * 应用效果结果到战斗精灵（委托给 EffectApplicator）
    */
   public static ApplyEffectResults(
     results: IEffectResult[],
     attacker: IBattlePet,
     defender: IBattlePet
   ): void {
-    for (const result of results) {
-      if (!result.success) {
-        continue;
-      }
-
-      const target = result.target === 'attacker' ? attacker : defender;
-
-      // ==================== 效果免疫检查 ====================
-      if (this.IsImmune(target, result)) {
-        Logger.Info(`[效果应用] ${target.name} 免疫效果: ${result.type}`);
-        continue;
-      }
-
-      switch (result.type) {
-        case 'heal':
-        case 'absorb':
-          // 回复HP
-          if (result.value && result.value > 0) {
-            target.hp = Math.min(target.maxHp, target.hp + result.value);
-            Logger.Info(`[效果应用] ${result.target} 回复 ${result.value} HP`);
-          }
-          break;
-
-        case 'damage':
-        case 'recoil':
-          // 造成伤害
-          if (result.value && result.value > 0) {
-            target.hp = Math.max(0, target.hp - result.value);
-            Logger.Info(`[效果应用] ${result.target} 受到 ${result.value} 点伤害`);
-          }
-          break;
-
-        case 'status':
-          // 应用状态效果
-          if (result.data && result.data.status !== undefined) {
-            if (!target.statusDurations) {
-              target.statusDurations = new Array(20).fill(0);
-            }
-            target.statusDurations[result.data.status] = result.data.duration || 3;
-            target.status = result.data.status;
-            target.statusTurns = result.data.duration || 3;
-            // Proxy 会自动同步 statusArray
-            
-            Logger.Info(
-              `[效果应用] ${result.target} 进入状态: ${result.data.statusName}, ` +
-              `持续 ${result.data.duration} 回合`
-            );
-          }
-          break;
-
-        case 'stat_change':
-          // 能力等级变化
-          if (result.data && result.data.stat !== undefined && result.data.stages !== undefined) {
-            if (!target.battleLv) {
-              target.battleLv = [0, 0, 0, 0, 0, 0];
-            }
-            const statIndex = result.data.stat;
-            const oldStage = target.battleLv[statIndex] || 0;
-            const newStage = Math.max(-6, Math.min(6, oldStage + result.data.stages));
-            target.battleLv[statIndex] = newStage;
-            
-            // 如果有持续时间，记录到effectCounters
-            if (result.data.duration && result.data.duration > 0) {
-              if (!target.effectCounters) {
-                target.effectCounters = {};
-              }
-              
-              // 检查是否已有同类临时效果
-              const counterKey = `stat_${statIndex}_boost_${result.data.stages}`;
-              const existingKeys = Object.keys(target.effectCounters).filter(
-                k => k.startsWith(`stat_${statIndex}_boost_`)
-              );
-              
-              if (existingKeys.length > 0) {
-                // 已有同类效果，根据叠加规则处理
-                const stackRule = result.data.stackRule || 'refresh'; // 默认刷新持续时间
-                
-                if (stackRule === 'refresh') {
-                  // 刷新持续时间，不叠加等级
-                  target.effectCounters[existingKeys[0]] = result.data.duration;
-                  Logger.Info(
-                    `[效果应用] ${result.target} 刷新能力变化持续时间: ` +
-                    `${this.GetStatName(statIndex)}, 持续${result.data.duration}回合`
-                  );
-                } else if (stackRule === 'stack') {
-                  // 叠加效果（新增计数器）
-                  target.effectCounters[counterKey] = result.data.duration;
-                  Logger.Info(
-                    `[效果应用] ${result.target} 叠加能力变化: ` +
-                    `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages}, ` +
-                    `持续${result.data.duration}回合`
-                  );
-                } else if (stackRule === 'replace') {
-                  // 替换旧效果
-                  // 先恢复旧效果
-                  for (const oldKey of existingKeys) {
-                    const oldMatch = oldKey.match(/stat_\d+_boost_(-?\d+)/);
-                    if (oldMatch) {
-                      const oldStages = parseInt(oldMatch[1]);
-                      target.battleLv[statIndex] = Math.max(-6, Math.min(6, target.battleLv[statIndex] - oldStages));
-                    }
-                    delete target.effectCounters[oldKey];
-                  }
-                  // 应用新效果（已在上面应用）
-                  target.effectCounters[counterKey] = result.data.duration;
-                  Logger.Info(
-                    `[效果应用] ${result.target} 替换能力变化: ` +
-                    `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages}, ` +
-                    `持续${result.data.duration}回合`
-                  );
-                }
-              } else {
-                // 没有同类效果，直接添加
-                target.effectCounters[counterKey] = result.data.duration;
-                Logger.Info(
-                  `[效果应用] ${result.target} 能力变化（临时${result.data.duration}回合）: ` +
-                  `${this.GetStatName(statIndex)} ${result.data.stages > 0 ? '+' : ''}${result.data.stages} ` +
-                  `(${oldStage} → ${newStage})`
-                );
-              }
-            } else {
-              const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
-              const change = result.data.stages > 0 ? '提升' : '降低';
-              Logger.Info(
-                `[效果应用] ${result.target} ${statNames[statIndex]}${change} ` +
-                `${Math.abs(result.data.stages)} 级 (${oldStage} → ${newStage})`
-              );
-            }
-          }
-          break;
-
-        case 'multi_hit':
-          // 连续攻击（在伤害计算时处理）
-          Logger.Info(`[效果应用] 连续攻击 ${result.value} 次`);
-          break;
-
-        case 'hp_equal':
-          // 同生共死 - 检查免疫
-          if (BossRules.IsSameLifeDeathImmune(defender.petId)) {
-            Logger.Info(`[效果应用] 同生共死被免疫: ${defender.name} (petId=${defender.petId})`);
-            break;
-          }
-          defender.hp = attacker.hp;
-          Logger.Info(`[效果应用] 同生共死: 对方HP变为 ${defender.hp}`);
-          break;
-
-        case 'mercy':
-          // 手下留情
-          if (defender.hp <= 0) {
-            defender.hp = 1;
-            Logger.Info(`[效果应用] 手下留情: 对方HP保留1点`);
-          }
-          break;
-
-        case 'encore':
-          // 克制
-          if (result.data && result.data.turns) {
-            defender.encore = true;
-            defender.encoreTurns = result.data.turns;
-            Logger.Info(`[效果应用] 克制: 对方被迫使用上次技能 ${result.data.turns} 回合`);
-          }
-          break;
-
-        case 'pp_reduce':
-          // 减少PP
-          if (defender.lastMove && defender.skillPP) {
-            const skillIndex = defender.skills.indexOf(defender.lastMove);
-            if (skillIndex >= 0 && defender.skillPP[skillIndex]) {
-              defender.skillPP[skillIndex] = Math.max(0, defender.skillPP[skillIndex] - 1);
-              Logger.Info(`[效果应用] 减少对方技能PP`);
-            }
-          }
-          break;
-
-        default:
-          // 跳过元数据/控制流类型（这些类型不需要实际应用）
-          if (result.type === 'conditional' || result.type === 'fixed_damage') {
-            // conditional: 条件判断结果，不需要应用
-            // fixed_damage: 固定伤害已通过伤害计算流程应用
-            break;
-          }
-          Logger.Debug(`[效果应用] 未处理的效果类型: ${result.type}`);
-      }
-    }
+    EffectApplicator.Apply(results, attacker, defender);
   }
 
   /**
    * 检查效果是否应该触发（概率判定）
    */
   public static ShouldTrigger(chance: number): boolean {
-    return Math.random() * 100 < chance;
-  }
-
-  /**
-   * 检查目标是否免疫效果
-   */
-  private static IsImmune(target: IBattlePet, result: IEffectResult): boolean {
-    if (!target.immuneFlags) {
-      return false;
-    }
-
-    // 免疫状态效果
-    if (result.type === 'status' && target.immuneFlags.status) {
-      return true;
-    }
-
-    // 免疫能力下降
-    if (result.type === 'stat_change' && result.data?.stages < 0 && target.immuneFlags.statDown) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * 获取能力名称
-   */
-  private static GetStatName(statIndex: number): string {
-    const statNames = ['攻击', '防御', '特攻', '特防', '速度', '命中'];
-    return statNames[statIndex] || '未知';
+    return EffectApplicator.ShouldTrigger(chance);
   }
 
   /**

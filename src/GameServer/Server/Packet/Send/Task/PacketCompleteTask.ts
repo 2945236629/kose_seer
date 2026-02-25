@@ -1,7 +1,7 @@
 import { BaseProto } from '../../../../../shared/proto/base/BaseProto';
 import { CommandID } from '../../../../../shared/protocol/CommandID';
 import { CompleteTaskRspProto } from '../../../../../shared/proto/packets/rsp/task/CompleteTaskRspProto';
-import { ITaskRewardItem } from '../../../../Game/Task/TaskConfig';
+import { ITaskRewardItem } from '../../../../../shared/config/game/TaskConfig';
 
 export class PacketCompleteTask extends BaseProto {
   private _data: Buffer;
@@ -13,7 +13,7 @@ export class PacketCompleteTask extends BaseProto {
     proto.taskId = taskId;
     proto.petId = petId;
     proto.captureTm = captureTm;
-    proto.items = items;
+    proto.items = items.map(item => ({ id: item.itemId, count: item.count }));
 
     if (result !== 0) {
       proto.setResult(result);

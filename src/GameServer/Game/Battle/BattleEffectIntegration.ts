@@ -102,6 +102,36 @@ function triggerOwnPassives(
  */
 export class BattleEffectIntegration {
 
+  // ==================== 通用触发方法 ====================
+
+  /**
+   * 通用时机触发：技能效果 + 双方被动特性
+   * 大部分时机（BEFORE_SKILL, ON_HIT, ON_KO 等）共享此流程
+   */
+  private static TriggerAtTiming(
+    attacker: IBattlePet,
+    defender: IBattlePet,
+    skill: ISkillConfig,
+    timing: EffectTiming,
+    damage: number = 0
+  ): IEffectResult[] {
+    const results: IEffectResult[] = [];
+
+    const skillResults = EffectTrigger.TriggerSkillEffect(
+      skill, attacker, defender, damage, timing
+    );
+    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
+    results.push(...skillResults);
+
+    const passiveResults = triggerBothPassives(
+      attacker, defender, timing, skill, damage
+    );
+    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
+    results.push(...passiveResults);
+
+    return results;
+  }
+
   // ==================== 战斗级别时机 ====================
 
   /**
@@ -302,53 +332,18 @@ export class BattleEffectIntegration {
    * 技能使用前触发效果
    */
   public static OnBeforeSkill(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.BEFORE_SKILL
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.BEFORE_SKILL, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.BEFORE_SKILL);
   }
 
   /**
    * 技能使用后触发效果
    */
   public static OnAfterSkill(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig,
-    damage: number
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig, damage: number
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, damage, EffectTiming.AFTER_SKILL
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.AFTER_SKILL, skill, damage
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.AFTER_SKILL, damage);
   }
 
   // ==================== 命中判定时机 ====================
@@ -357,79 +352,27 @@ export class BattleEffectIntegration {
    * 命中判定前触发效果
    */
   public static OnBeforeHitCheck(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.BEFORE_HIT_CHECK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（如必中、命中率增减）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.BEFORE_HIT_CHECK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.BEFORE_HIT_CHECK);
   }
 
   /**
    * 命中判定时触发效果
    */
   public static OnHitCheck(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.HIT_CHECK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.HIT_CHECK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.HIT_CHECK);
   }
 
   /**
    * 命中判定后触发效果
    */
   public static OnAfterHitCheck(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig,
-    hit: boolean
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig, hit: boolean
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.AFTER_HIT_CHECK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.AFTER_HIT_CHECK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.AFTER_HIT_CHECK);
   }
 
   // ==================== 暴击判定时机 ====================
@@ -438,52 +381,18 @@ export class BattleEffectIntegration {
    * 暴击判定前触发效果
    */
   public static OnBeforeCritCheck(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.BEFORE_CRIT_CHECK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（如暴击率固定/提升）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.BEFORE_CRIT_CHECK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.BEFORE_CRIT_CHECK);
   }
 
   /**
    * 暴击判定时触发效果
    */
   public static OnCritCheck(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.CRIT_CHECK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.CRIT_CHECK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.CRIT_CHECK);
   }
 
   // ==================== 伤害计算时机 ====================
@@ -492,26 +401,9 @@ export class BattleEffectIntegration {
    * 伤害计算前触发效果
    */
   public static OnBeforeDamageCalc(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.BEFORE_DAMAGE_CALC
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（如伤害增加、某系伤害增强）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.BEFORE_DAMAGE_CALC, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.BEFORE_DAMAGE_CALC);
   }
 
   /**
@@ -609,29 +501,9 @@ export class BattleEffectIntegration {
    * 伤害应用后触发效果
    */
   public static OnAfterDamageApply(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig,
-    damage: number
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig, damage: number
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 伤害应用后: Damage=${damage}`);
-
-    // 技能效果（吸血、反伤、状态施加等）
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, damage, EffectTiming.AFTER_DAMAGE_APPLY
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（反弹伤害、受攻击施加异常、能力变化等）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.AFTER_DAMAGE_APPLY, skill, damage
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.AFTER_DAMAGE_APPLY, damage);
   }
 
   // ==================== 受击/攻击时机 ====================
@@ -640,79 +512,27 @@ export class BattleEffectIntegration {
    * 受到攻击时触发效果
    */
   public static OnAttacked(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.ON_ATTACKED
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_ATTACKED, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_ATTACKED);
   }
 
   /**
    * 攻击时触发效果
    */
   public static OnAttack(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.ON_ATTACK
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_ATTACK, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_ATTACK);
   }
 
   /**
    * 受到伤害时触发效果
    */
   public static OnReceiveDamage(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig,
-    damage: number
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig, damage: number
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, damage, EffectTiming.ON_RECEIVE_DAMAGE
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（受伤后反应：如受大伤下招翻倍、受伤恢复等）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_RECEIVE_DAMAGE, skill, damage
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_RECEIVE_DAMAGE, damage);
   }
 
   // ==================== 击败时机 ====================
@@ -721,54 +541,18 @@ export class BattleEffectIntegration {
    * 击败对手时触发效果
    */
   public static OnKO(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 击败对手: Attacker=${attacker.name}`);
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.ON_KO
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_KO, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_KO);
   }
 
   /**
    * 击败对方后触发效果
    */
   public static OnAfterKO(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 击败对方后: Attacker=${attacker.name}`);
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.AFTER_KO
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.AFTER_KO, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.AFTER_KO);
   }
 
   // ==================== HP变化时机 ====================
@@ -808,27 +592,9 @@ export class BattleEffectIntegration {
    * 闪避时触发效果
    */
   public static OnEvade(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 闪避攻击: Defender=${defender.name}`);
-
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.ON_EVADE
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性（如闪避后回血）
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_EVADE, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_EVADE);
   }
 
   // ==================== 出手流程时机（9阶段） ====================
@@ -874,93 +640,29 @@ export class BattleEffectIntegration {
 
   /**
    * 阶段3: 命中时
-   * - 需命中才触发的效果
-   * - 在命中判定通过后、技能效果结算前触发
    */
   public static OnHit(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 命中时: ${attacker.name} → ${defender.name}`);
-
-    // 技能效果
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.ON_HIT
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ON_HIT, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ON_HIT);
   }
 
   /**
    * 阶段4: 即时技能效果结算
-   * - 大部分技能副作用在此生效（能力变化、状态施加等）
-   * - 在命中后、伤害计算前触发
    */
   public static OnSkillEffect(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 即时技能效果结算: ${attacker.name} → ${defender.name}`);
-
-    // 技能效果
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, 0, EffectTiming.SKILL_EFFECT
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.SKILL_EFFECT, skill
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.SKILL_EFFECT);
   }
 
   /**
    * 阶段8: 出手流程结束时
-   * - 单次攻击所有伤害结算完毕后触发
-   * - 在击败判定前触发
    */
   public static OnAttackEnd(
-    attacker: IBattlePet,
-    defender: IBattlePet,
-    skill: ISkillConfig,
-    damage: number
+    attacker: IBattlePet, defender: IBattlePet, skill: ISkillConfig, damage: number
   ): IEffectResult[] {
-    const results: IEffectResult[] = [];
-    Logger.Debug(`[BattleEffectIntegration] 出手流程结束时: ${attacker.name} → ${defender.name}, Damage=${damage}`);
-
-    // 技能效果
-    const skillResults = EffectTrigger.TriggerSkillEffect(
-      skill, attacker, defender, damage, EffectTiming.ATTACK_END
-    );
-    EffectTrigger.ApplyEffectResults(skillResults, attacker, defender);
-    results.push(...skillResults);
-
-    // 被动特性
-    const passiveResults = triggerBothPassives(
-      attacker, defender, EffectTiming.ATTACK_END, skill, damage
-    );
-    EffectTrigger.ApplyEffectResults(passiveResults, attacker, defender);
-    results.push(...passiveResults);
-
-    return results;
+    return this.TriggerAtTiming(attacker, defender, skill, EffectTiming.ATTACK_END, damage);
   }
 
   /**

@@ -25,7 +25,7 @@ export class AcceptTaskHandler implements IHandler {
       Logger.Info(`[AcceptTaskHandler] 用户 ${player.Uid} 接受任务 ${taskId}`);
 
       // 检查是否已接受
-      if (player.TaskManager.TaskData.IsTaskAccepted(taskId)) {
+      if (player.TaskManager.IsTaskAccepted(taskId)) {
         Logger.Warn(`[AcceptTaskHandler] 任务 ${taskId} 已接受`);
         await player.SendPacket(new PacketAcceptTask(taskId, 5002));
         return;

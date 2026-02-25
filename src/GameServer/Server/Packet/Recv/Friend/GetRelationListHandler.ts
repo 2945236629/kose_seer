@@ -18,12 +18,10 @@ export class GetRelationListHandler implements IHandler {
     try {
       Logger.Debug(`[GetRelationListHandler] 用户 ${player.Uid} 请求好友列表`);
 
-      const friendData = player.FriendManager.FriendData;
-      
       // 发送好友列表和黑名单
       await player.SendPacket(new PacketGetRelationList(
-        friendData.FriendList,
-        friendData.BlackList
+        player.FriendManager.GetFriendList(),
+        player.FriendManager.GetBlackList()
       ));
     } catch (error) {
       Logger.Error(`[GetRelationListHandler] 失败`, error as Error);

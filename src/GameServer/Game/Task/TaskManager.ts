@@ -3,8 +3,10 @@ import { Logger } from '../../../shared/utils/Logger';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
 import { PlayerInstance } from '../Player/PlayerInstance';
 import { BaseManager } from '../Base/BaseManager';
-import { TaskConfig, ITaskRewardItem } from './TaskConfig';
+import { TaskConfig, ITaskRewardItem } from '../../../shared/config/game/TaskConfig';
 import { PacketCompleteTask } from '../../Server/Packet/Send/Task/PacketCompleteTask';
+import { GameEventBus } from '../Event/GameEventBus';
+import { BattleEventType, IBattleEndEvent, ItemEventType, IItemGainedEvent, PetEventType, IPetObtainedEvent, ItemGainSource, PetObtainSource } from '../Event/EventTypes';
 
 /**
  * 任务管理器
@@ -20,6 +22,36 @@ export class TaskManager extends BaseManager {
     super(player);
   }
 
+  // ==================== 事件注册 ====================
+
+  /**
+   * 注册事件监听
+   * - 战斗结束: 检查击杀类任务进度
+   * - 物品获得: 检查收集类任务进度
+   * - 精灵获得: 检查精灵收集类任务进度
+   */
+  public RegisterEvents(eventBus: GameEventBus): void {
+    eventBus.On<IBattleEndEvent>(BattleEventType.BATTLE_END, this.OnBattleEnd.bind(this), 100);
+    eventBus.On<IItemGainedEvent>(ItemEventType.ITEM_GAINED, this.OnItemGained.bind(this), 100);
+    eventBus.On<IPetObtainedEvent>(PetEventType.PET_OBTAINED, this.OnPetObtained.bind(this), 100);
+  }
+
+  private OnBattleEnd(event: IBattleEndEvent): void {
+    if (!event.isVictory) return;
+    Logger.Debug(`[TaskManager] 战斗胜利事件: UserID=${this.UserID}, MapId=${event.mapId}, EnemyPetId=${event.enemyPetId}`);
+    // 未来扩展：检查击杀类任务进度
+  }
+
+  private OnItemGained(event: IItemGainedEvent): void {
+    Logger.Debug(`[TaskManager] 物品获得事件: UserID=${this.UserID}, ItemId=${event.itemId}, Count=${event.count}`);
+    // 未来扩展：检查收集类任务进度
+  }
+
+  private OnPetObtained(event: IPetObtainedEvent): void {
+    Logger.Debug(`[TaskManager] 精灵获得事件: UserID=${this.UserID}, PetId=${event.petId}, Level=${event.level}`);
+    // 未来扩展：检查精灵收集类任务进度
+  }
+
   /**
    * 初始化任务管理器
    */
@@ -27,6 +59,29 @@ export class TaskManager extends BaseManager {
     // 通过 DatabaseHelper 加载或创建任务数据
     this.TaskData = await DatabaseHelper.Instance.GetInstanceOrCreateNew_TaskData(this.UserID);
     Logger.Debug(`[TaskManager] 用户 ${this.UserID} 初始化完成`);
+  }
+
+  // ==================== 公开查询 API ====================
+
+  /**
+   * 获取任务状态数组（用于登录响应等）
+   */
+  public GetTaskStatusArray(): number[] {
+    return this.TaskData.GetTaskStatusArray();
+  }
+
+  /**
+   * 获取任务总数
+   */
+  public GetTaskCount(): number {
+    return this.TaskData.TaskList.size;
+  }
+
+  /**
+   * 检查任务是否已接受
+   */
+  public IsTaskAccepted(taskId: number): boolean {
+    return this.TaskData.IsTaskAccepted(taskId);
   }
 
   /**
@@ -77,23 +132,23 @@ export class TaskManager extends BaseManager {
         captureTm = Math.floor(Date.now() / 1000);
 
         // 给玩家精灵 - 新手精灵等级为5
-        await this.Player.PetManager.GivePet(petId, 5, captureTm);
+        await this.Player.PetManager.GivePet(petId, 5, captureTm, PetObtainSource.TASK_REWARD);
         Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 精灵 ${petId}, 等级5, catchTime=0x${captureTm.toString(16)}`);
       }
 
       // 2. 处理物品奖励
       if (taskConfig.rewards?.items) {
         for (const item of taskConfig.rewards.items) {
-          await this.Player.ItemManager.GiveItem(item.id, item.count);
-          rewardItems.push(item);
-          Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 物品 ${item.id} x${item.count}`);
+          await this.Player.ItemManager.GiveItem(item.itemId, item.count, ItemGainSource.TASK_REWARD);
+          rewardItems.push({ itemId: item.itemId, count: item.count });
+          Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 物品 ${item.itemId} x${item.count}`);
         }
       }
 
       // 3. 处理金币奖励
       if (taskConfig.rewards?.coins) {
-        this.Player.Data.coins += taskConfig.rewards.coins;  // 自动保存
-        rewardItems.push({ id: 1, count: taskConfig.rewards.coins });
+        this.Player.Data.coins += taskConfig.rewards.coins;
+        rewardItems.push({ itemId: 1, count: taskConfig.rewards.coins });
         Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 金币 ${taskConfig.rewards.coins}`);
       }
 
@@ -101,10 +156,31 @@ export class TaskManager extends BaseManager {
       if (taskConfig.rewards?.special) {
         for (const special of taskConfig.rewards.special) {
           if (special.type === 1) {
-            // 金币
-            this.Player.Data.coins += special.value;  // 自动保存
+            this.Player.Data.coins += special.value;
+          } else if (special.type === 3) {
+            // 经验值 - 暂不处理
+          } else if (special.type === 5) {
+            // 赛尔豆
+            this.Player.Data.coins += special.value;
           }
-          rewardItems.push({ id: special.type, count: special.value });
+          rewardItems.push({ itemId: special.type, count: special.value });
+        }
+      }
+
+      // 5. 处理精灵奖励
+      if (taskConfig.rewards?.pets) {
+        for (const pet of taskConfig.rewards.pets) {
+          const catchTime = Math.floor(Date.now() / 1000);
+          await this.Player.PetManager.GivePet(pet.petId, pet.level, catchTime, PetObtainSource.TASK_REWARD);
+          Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 精灵 ${pet.petId}, 等级${pet.level}`);
+        }
+      }
+
+      // 6. 处理家具奖励（暂按物品处理）
+      if (taskConfig.rewards?.fitments) {
+        for (const fitment of taskConfig.rewards.fitments) {
+          await this.Player.ItemManager.GiveItem(fitment.fitmentId, fitment.count, ItemGainSource.TASK_REWARD);
+          Logger.Info(`[TaskManager] 给予用户 ${this.UserID} 家具 ${fitment.fitmentId} x${fitment.count}`);
         }
       }
 

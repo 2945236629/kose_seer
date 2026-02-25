@@ -1,9 +1,8 @@
 import { BaseManager } from '../Base/BaseManager';
 import { Logger } from '../../../shared/utils';
 import { PlayerInstance } from '../Player/PlayerInstance';
-import { OnlineTracker } from '../Player/OnlineTracker';
 import { IBattleInfo, IBattlePet, IAttackResult, ITurnResult } from '../../../shared/models/BattleModel';
-import { BattleInitService, BattleTurnService, BattleRewardService } from './services';
+import { BattleInitService, BattleTurnService, BattleRewardService, BattlePvpService } from './services';
 import { BattleConverter } from './BattleConverter';
 import { PacketEmpty } from '../../Server/Packet/Send/PacketEmpty';
 import { CommandID } from '../../../shared/protocol/CommandID';
@@ -12,6 +11,23 @@ import { BattleEffectIntegration } from './BattleEffectIntegration';
 import { BossSpecialRules } from './BossSpecialRules';
 import { SimplePetInfoProto } from '../../../shared/proto/common/SimplePetInfoProto';
 import { AttackValueProto } from '../../../shared/proto/common/AttackValueProto';
+import {
+  BattleEventType,
+  IAttackResultEvent,
+  IBattleEndEvent,
+  IBattleRoundEndEvent,
+  IBattleRoundStartEvent,
+  IBattleStartEvent,
+  ICatchResultEvent,
+  IEscapeResultEvent,
+  IPetDeadEvent,
+  IPlayerLogoutEvent,
+  IPetSwitchEvent,
+  PlayerEventType,
+  IStatusChangeEvent,
+} from '../Event/EventTypes';
+import { GameEventBus } from '../Event/GameEventBus';
+import { BattleType } from '../../../shared/models/BattleModel';
 import {
   PacketNoteReadyToFight,
   PacketNoteStartFight,
@@ -24,17 +40,18 @@ import {
   PacketChangePet
 } from '../../Server/Packet/Send/Battle';
 import { PacketMapBoss, PacketMapOgreList } from '../../Server/Packet/Send/Map';
-import { PvpBattleManager, IPvpAction } from './PvpBattleManager';
+import { PvpBattleManager } from './PvpBattleManager';
 import { BossAbilityConfig } from './BossAbility';
 
 /**
  * 战斗管理器
- * 处理战斗相关的所有逻辑：挑战BOSS、准备战斗、使用技能、捕捉精灵等
+ * 处理PvE战斗逻辑：挑战BOSS、准备战斗、使用技能、捕捉精灵等
+ * PvP逻辑委托给 BattlePvpService
  *
  * 架构说明：
  * - Manager 负责协调各个 Service
- * - Service 负责具体的业务逻辑和数据库操作
- * - Manager 只处理请求转发和响应发送
+ * - BattlePvpService 处理所有PvP相关逻辑
+ * - BattleInitService / BattleTurnService / BattleRewardService 处理具体业务
  * - 使用 BattleConverter 简化 Proto 构建
  */
 export class BattleManager extends BaseManager {
@@ -42,6 +59,7 @@ export class BattleManager extends BaseManager {
   private _initService: BattleInitService;
   private _turnService: BattleTurnService;
   private _rewardService: BattleRewardService;
+  private _pvpService: BattlePvpService;
 
   // 当前战斗实例（会话级别）
   private _currentBattle: IBattleInfo | null = null;
@@ -53,6 +71,7 @@ export class BattleManager extends BaseManager {
 
   // 记录战斗中所有参与过的精灵HP（用于战斗结束时同步）
   private _battlePetHPMap: Map<number, number> = new Map(); // catchTime -> HP
+  private _emittedDeadCatchTimes: Set<number> = new Set();
 
   constructor(player: PlayerInstance) {
     super(player);
@@ -61,9 +80,33 @@ export class BattleManager extends BaseManager {
     this._initService = new BattleInitService(player);
     this._turnService = new BattleTurnService();
     this._rewardService = new BattleRewardService(player);
+
+    // 初始化PvP服务（通过回调桥接共享状态）
+    this._pvpService = new BattlePvpService(player, this._initService, this._turnService, {
+      getBattle: () => this._currentBattle,
+      getHPMap: () => this._battlePetHPMap,
+      updateBattlePet: (bp, np, pc) => this.UpdateBattlePet(bp, np, pc),
+      buildAttackValuePair: (r, p1, p2) => this.BuildAttackValuePair(r, p1, p2),
+      deductSkillPP: (pet, sid) => this.DeductSkillPP(pet, sid),
+      sendFightOverPacket: (p, r, w) => this.SendFightOverPacket(p, r, w),
+      handleFightOver: (w, r) => this.HandleFightOver(w, r),
+      syncBattlePetHP: () => this.SyncBattlePetHP(),
+      cleanupBattle: () => this.CleanupBattle(),
+      initializeBattle: (b) => this.InitializeBattle(b),
+    });
   }
 
   // ==================== 共享辅助方法 ====================
+
+  public RegisterEvents(eventBus: GameEventBus): void {
+    // Keep old logout sequence: map leave first, then battle/PVP cleanup.
+    eventBus.On<IPlayerLogoutEvent>(PlayerEventType.LOGOUT, this.OnPlayerLogoutEvent.bind(this), 20);
+  }
+
+  private async OnPlayerLogoutEvent(_event: IPlayerLogoutEvent): Promise<void> {
+    await this.OnLogout();
+    PvpBattleManager.Instance.OnPlayerLogout(this.UserID);
+  }
 
   /**
    * 扣除技能PP
@@ -158,6 +201,169 @@ export class BattleManager extends BaseManager {
     }
   }
 
+  private GetBattleTypeForEvent(battle: IBattleInfo): BattleType {
+    if (battle.battleType) return battle.battleType;
+    return battle.isPvp === true ? BattleType.PVP : BattleType.PVE;
+  }
+
+  private CaptureStatusSnapshot(): {
+    player: { status?: number; turns: number };
+    enemy: { status?: number; turns: number };
+  } {
+    if (!this._currentBattle) {
+      return {
+        player: { status: undefined, turns: 0 },
+        enemy: { status: undefined, turns: 0 },
+      };
+    }
+
+    return {
+      player: {
+        status: this._currentBattle.player.status,
+        turns: this._currentBattle.player.statusTurns || 0,
+      },
+      enemy: {
+        status: this._currentBattle.enemy.status,
+        turns: this._currentBattle.enemy.statusTurns || 0,
+      },
+    };
+  }
+
+  private async EmitBattleStartEvent(): Promise<void> {
+    if (!this._currentBattle) return;
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.BATTLE_START,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      battleType: this.GetBattleTypeForEvent(this._currentBattle),
+      mapId: this._currentBattleMapId,
+      playerPetId: this._currentBattle.player.petId,
+      enemyPetId: this._currentBattle.enemy.petId,
+      enemyLevel: this._currentBattle.enemy.level,
+    } as IBattleStartEvent);
+  }
+
+  private async EmitRoundStartEvent(round: number): Promise<void> {
+    if (!this._currentBattle) return;
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.ROUND_START,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      battleType: this.GetBattleTypeForEvent(this._currentBattle),
+      mapId: this._currentBattleMapId,
+      round,
+    } as IBattleRoundStartEvent);
+  }
+
+  private async EmitRoundEndEvent(round: number, isOver: boolean, winnerId?: number): Promise<void> {
+    if (!this._currentBattle) return;
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.ROUND_END,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      battleType: this.GetBattleTypeForEvent(this._currentBattle),
+      mapId: this._currentBattleMapId,
+      round,
+      isOver,
+      winnerId,
+    } as IBattleRoundEndEvent);
+  }
+
+  private async EmitAttackResultEvents(result: ITurnResult): Promise<void> {
+    if (!this._currentBattle) return;
+
+    const emitSingle = async (attack?: IAttackResult): Promise<void> => {
+      if (!attack || attack.skillId <= 0) return;
+
+      const attackerIsPlayer = attack.userId === this._currentBattle!.userId;
+      const attackerPet = attackerIsPlayer ? this._currentBattle!.player : this._currentBattle!.enemy;
+      const targetPet = attackerIsPlayer ? this._currentBattle!.enemy : this._currentBattle!.player;
+
+      await this.Player.EventBus.Emit({
+        type: BattleEventType.ATTACK_RESULT,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        attackerId: attackerPet.petId,
+        targetId: targetPet.petId,
+        skillId: attack.skillId,
+        damage: attack.damage,
+        isCritical: attack.isCrit,
+        isMissed: attack.missed,
+        hpChange: -attack.damage,
+      } as IAttackResultEvent);
+    };
+
+    await emitSingle(result.firstAttack);
+    await emitSingle(result.secondAttack);
+  }
+
+  private async EmitStatusChangeEvents(before: {
+    player: { status?: number; turns: number };
+    enemy: { status?: number; turns: number };
+  }): Promise<void> {
+    if (!this._currentBattle) return;
+
+    const emitTransition = async (
+      pet: IBattlePet,
+      prevStatus?: number,
+      prevTurns: number = 0
+    ): Promise<void> => {
+      const currentStatus = pet.status;
+      const currentTurns = pet.statusTurns || 0;
+
+      if (prevStatus === currentStatus) return;
+
+      if (prevStatus !== undefined) {
+        await this.Player.EventBus.Emit({
+          type: BattleEventType.STATUS_CHANGE,
+          timestamp: Date.now(),
+          playerId: this.UserID,
+          petId: pet.petId,
+          status: prevStatus,
+          statusTurns: prevTurns,
+          isAdd: false,
+        } as IStatusChangeEvent);
+      }
+
+      if (currentStatus !== undefined) {
+        await this.Player.EventBus.Emit({
+          type: BattleEventType.STATUS_CHANGE,
+          timestamp: Date.now(),
+          playerId: this.UserID,
+          petId: pet.petId,
+          status: currentStatus,
+          statusTurns: currentTurns,
+          isAdd: true,
+        } as IStatusChangeEvent);
+      }
+    };
+
+    await emitTransition(this._currentBattle.player, before.player.status, before.player.turns);
+    await emitTransition(this._currentBattle.enemy, before.enemy.status, before.enemy.turns);
+  }
+
+  private async EmitPetDeadEventsIfNeeded(): Promise<void> {
+    if (!this._currentBattle) return;
+
+    const emitDead = async (pet: IBattlePet, killerPetId: number): Promise<void> => {
+      if (pet.hp > 0) return;
+      if (this._emittedDeadCatchTimes.has(pet.catchTime)) return;
+      this._emittedDeadCatchTimes.add(pet.catchTime);
+
+      await this.Player.EventBus.Emit({
+        type: BattleEventType.PET_DEAD,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        petId: pet.petId,
+        catchTime: pet.catchTime,
+        killerId: killerPetId,
+      } as IPetDeadEvent);
+    };
+
+    await emitDead(this._currentBattle.player, this._currentBattle.enemy.petId);
+    await emitDead(this._currentBattle.enemy, this._currentBattle.player.petId);
+  }
+
   /**
    * PvE精灵阵亡检查
    * 检查玩家精灵是否阵亡，同步HP，检查是否还有健康精灵
@@ -165,9 +371,10 @@ export class BattleManager extends BaseManager {
    */
   private async CheckPlayerPetDeath(): Promise<boolean> {
     if (!this._currentBattle || this._currentBattle.player.hp > 0) return false;
+    await this.EmitPetDeadEventsIfNeeded();
 
     // 同步当前精灵的HP（阵亡）
-    const currentPet = this.Player.PetManager.PetData.GetPetsInBag()
+    const currentPet = this.Player.PetManager.GetPetsInBag()
       .find(p => p.catchTime === this._currentBattle!.player.catchTime);
     if (currentPet) {
       currentPet.hp = 0;
@@ -175,7 +382,7 @@ export class BattleManager extends BaseManager {
     }
 
     // 检查是否还有其他健康精灵
-    const playerPets = this.Player.PetManager.PetData.GetPetsInBag();
+    const playerPets = this.Player.PetManager.GetPetsInBag();
     const currentCatchTime = this._currentBattle.player.catchTime;
     const hasHealthyPet = playerPets.some(p => p.hp > 0 && p.catchTime !== currentCatchTime);
 
@@ -226,7 +433,7 @@ export class BattleManager extends BaseManager {
   private ValidateChangePet(catchTime: number, isPvp: boolean): { newPet: any; petConfig: any } | null {
     if (!this._currentBattle) return null;
 
-    const playerPets = this.Player.PetManager.PetData.GetPetsInBag();
+    const playerPets = this.Player.PetManager.GetPetsInBag();
     const newPet = playerPets.find(p => p.catchTime === catchTime);
 
     if (!newPet) {
@@ -273,29 +480,6 @@ export class BattleManager extends BaseManager {
       playerData.energyTimes || 0,
       playerData.learnTimes || 0
     ));
-  }
-
-  /**
-   * 通知PvP对手战斗结束
-   */
-  private async NotifyPvpOpponentFightOver(reason: number, winnerId: number): Promise<void> {
-    if (!this._currentBattle?.player2Id) return;
-
-    const actualOpponentId = this.UserID === this._currentBattle.userId
-      ? this._currentBattle.player2Id
-      : this._currentBattle.userId;
-    const savedPlayer1Id = this._currentBattle.userId;
-    const savedPlayer2Id = this._currentBattle.player2Id;
-
-    const opponentSession = OnlineTracker.Instance.GetPlayerSession(actualOpponentId);
-    if (opponentSession?.Player) {
-      await this.SendFightOverPacket(opponentSession.Player, reason, winnerId);
-      await opponentSession.Player.BattleManager.SyncBattlePetHP();
-      opponentSession.Player.BattleManager.CleanupBattle();
-    }
-
-    const roomKey = PvpBattleManager.Instance['GetRoomKey'](savedPlayer1Id, savedPlayer2Id);
-    PvpBattleManager.Instance.RemoveBattleRoom(roomKey);
   }
 
   /**
@@ -381,7 +565,7 @@ export class BattleManager extends BaseManager {
     this._battlePetHPMap.set(currentBattlePet.catchTime, currentBattlePet.hp);
 
     // 2. 同步所有参与过战斗的精灵HP
-    const playerPets = this.Player.PetManager.PetData.GetPetsInBag();
+    const playerPets = this.Player.PetManager.GetPetsInBag();
 
     for (const [catchTime, battleHP] of this._battlePetHPMap.entries()) {
       const playerPet = playerPets.find(p => p.catchTime === catchTime);
@@ -415,6 +599,7 @@ export class BattleManager extends BaseManager {
   private InitializeBattle(battle: IBattleInfo): void {
     this._currentBattle = battle;
     this._battlePetHPMap.clear();
+    this._emittedDeadCatchTimes.clear();
     this._battlePetHPMap.set(battle.player.catchTime, battle.player.hp);
 
     Logger.Debug(
@@ -433,6 +618,7 @@ export class BattleManager extends BaseManager {
     this._currentBattleMapId = -1;
     this._currentBattleOriginalPetId = -1;
     this._battlePetHPMap.clear();
+    this._emittedDeadCatchTimes.clear();
 
     Logger.Debug(`[BattleManager] 清理战斗数据: UserID=${this.UserID}`);
   }
@@ -512,11 +698,11 @@ export class BattleManager extends BaseManager {
       monsterLevel = Math.max(1, Math.min(monsterLevel, 100));
 
       // 创建战斗实例
-      const battle = await this._initService.CreatePVEBattle(this.UserID, monsterId, monsterLevel);
+      const battle = await this._initService.CreatePVEBattle(monsterId, monsterLevel);
 
       if (!battle) {
         // 检查是否是因为没有健康的精灵
-        const healthyPets = this.Player.PetManager.PetData.GetPetsInBag().filter(p => p.hp > 0);
+        const healthyPets = this.Player.PetManager.GetPetsInBag().filter(p => p.hp > 0);
         if (healthyPets.length === 0) {
           await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_NPC_MONSTER).setResult(10017));
           Logger.Warn(`[BattleManager] 玩家所有精灵已阵亡: UserID=${this.UserID}`);
@@ -564,6 +750,27 @@ export class BattleManager extends BaseManager {
         this.CleanupBattle();
       }
 
+      // 谱尼挑战：检查封印解锁状态
+      if ((mapId === 108 || mapId === 514) && param2 >= 1 && param2 <= 8) {
+        const door = param2;
+        const puniLevel = this.Player.ChallengeProgressManager.GetPuniLevel();
+
+        // 封印1-7：需要 maxPuniLv >= door-1
+        if (door >= 1 && door <= 7) {
+          if (puniLevel < door - 1) {
+            Logger.Warn(`[BattleManager] 谱尼封印未解锁: Door=${door}, MaxPuniLv=${puniLevel}`);
+            await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(11027));
+            return;
+          }
+        }
+        // 真身（8）：需要 maxPuniLv >= 7
+        if (door === 8 && puniLevel < 7) {
+          Logger.Warn(`[BattleManager] 谱尼真身未解锁: MaxPuniLv=${puniLevel}`);
+          await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(11027));
+          return;
+        }
+      }
+
       // 1. 尝试从 (mapId, param2) 查找BOSS配置
       let bossConfig = BossAbilityConfig.Instance.GetBossConfigByMapAndParam(mapId, param2);
       let actualParam2 = param2;
@@ -591,10 +798,10 @@ export class BattleManager extends BaseManager {
       }
 
       // 使用CreateBossBattle方法
-      const battle = await this._initService.CreateBossBattle(this.UserID, mapId, actualParam2);
+      const battle = await this._initService.CreateBossBattle(mapId, actualParam2);
 
       if (!battle) {
-        const healthyPets = this.Player.PetManager.PetData.GetPetsInBag().filter(p => p.hp > 0);
+        const healthyPets = this.Player.PetManager.GetPetsInBag().filter(p => p.hp > 0);
         if (healthyPets.length === 0) {
           await this.Player.SendPacket(new PacketEmpty(CommandID.CHALLENGE_BOSS).setResult(10017));
           Logger.Warn(`[BattleManager] 玩家所有精灵已阵亡: UserID=${this.UserID}`);
@@ -619,6 +826,63 @@ export class BattleManager extends BaseManager {
   }
 
   /**
+   * 处理盖亚挑战
+   * CMD 2421: FIGHT_SPECIAL_PET
+   * 
+   * 逻辑与 go-server handleChallengeBoss 一致：
+   * - 优先从配置获取BOSS
+   * - 未匹配到配置时回退到盖亚
+   */
+  public async HandleFightSpecialPet(mapId: number, param2: number): Promise<void> {
+    try {
+      // 清理旧战斗
+      if (this._currentBattle) {
+        this.CleanupBattle();
+      }
+
+      // 尝试从配置获取
+      let bossConfig = BossAbilityConfig.Instance.GetBossConfigByMapAndParam(mapId, param2);
+      let actualParam2 = param2;
+
+      if (bossConfig) {
+        Logger.Info(
+          `[BattleManager] 盖亚挑战(配置命中): MapId=${mapId}, Param2=${param2} -> ` +
+          `PetId=${bossConfig.petId}, Level=${bossConfig.level}`
+        );
+      } else {
+        // 回退到 param2=0
+        bossConfig = BossAbilityConfig.Instance.GetBossConfigByMapAndParam(mapId, 0);
+        if (bossConfig) {
+          actualParam2 = 0;
+          Logger.Info(`[BattleManager] 盖亚挑战回退到param2=0`);
+        } else {
+          // 配置未找到，回退到盖亚
+          Logger.Info(`[BattleManager] 盖亚挑战配置未找到，使用盖亚默认配置`);
+        }
+      }
+
+      // 使用CreateBossBattle方法
+      const battle = await this._initService.CreateBossBattle(mapId, actualParam2);
+
+      if (!battle) {
+        await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_SPECIAL_PET).setResult(5001));
+        Logger.Warn(`[BattleManager] 创建盖亚战斗失败: UserID=${this.UserID}`);
+        return;
+      }
+
+      this.InitializeBattle(battle);
+
+      await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_SPECIAL_PET));
+      await this.SendReadyToFight(battle, 'BOSS');
+
+      Logger.Info(`[BattleManager] 盖亚挑战: UserID=${this.UserID}, MapId=${mapId}`);
+    } catch (error) {
+      Logger.Error(`[BattleManager] HandleFightSpecialPet failed`, error as Error);
+      await this.Player.SendPacket(new PacketEmpty(CommandID.FIGHT_SPECIAL_PET).setResult(5000));
+    }
+  }
+
+  /**
    * 处理准备战斗
    * CMD 2404: READY_TO_FIGHT
    * 发送 NOTE_START_FIGHT (2504)
@@ -628,7 +892,7 @@ export class BattleManager extends BaseManager {
     const pvpRoom = PvpBattleManager.Instance.GetPlayerRoom(this.Player.Uid);
 
     if (pvpRoom) {
-      await this.HandlePvpReadyToFight(pvpRoom);
+      await this._pvpService.HandleReadyToFight(pvpRoom);
       return;
     }
 
@@ -658,136 +922,9 @@ export class BattleManager extends BaseManager {
     const enemyPet = BattleConverter.ToFightPetInfo(this._currentBattle.enemy, 0, 1);
 
     await this.Player.SendPacket(new PacketNoteStartFight(0, playerPet, enemyPet));
+    await this.EmitBattleStartEvent();
 
     Logger.Info(`[BattleManager] 准备战斗(PVE): UserID=${this.Player.Uid}`);
-  }
-
-  /**
-   * 处理PVP战斗准备
-   */
-  private async HandlePvpReadyToFight(pvpRoom: any): Promise<void> {
-    const allReady = PvpBattleManager.Instance.SetPlayerReady(this.Player.Uid);
-
-    if (!allReady) {
-      Logger.Info(`[BattleManager] PVP战斗准备: UserID=${this.Player.Uid}, 等待对手准备`);
-      return;
-    }
-
-    Logger.Info(`[BattleManager] PVP战斗双方准备完毕，开始创建战斗实例`);
-
-    const player1Session = OnlineTracker.Instance.GetPlayerSession(pvpRoom.player1Id);
-    const player2Session = OnlineTracker.Instance.GetPlayerSession(pvpRoom.player2Id);
-
-    if (!player1Session?.Player || !player2Session?.Player) {
-      Logger.Error(`[BattleManager] 无法获取PVP玩家实例`);
-      return;
-    }
-
-    const battle = await this.CreatePvpBattle(player1Session.Player, player2Session.Player);
-
-    if (!battle) {
-      Logger.Error(`[BattleManager] 创建PVP战斗失败`);
-      return;
-    }
-
-    player1Session.Player.BattleManager.InitializeBattle(battle);
-    player2Session.Player.BattleManager.InitializeBattle(battle);
-
-    // 初始化对手的HP记录（player2视角）
-    player2Session.Player.BattleManager._battlePetHPMap.set(battle.enemy.catchTime, battle.enemy.hp);
-
-    const battleStartResults = BattleEffectIntegration.OnBattleStart(battle);
-    Logger.Debug(`[BattleManager] PVP战斗开始效果: ${battleStartResults.length}个结果`);
-
-    const player1Pet = BattleConverter.ToFightPetInfo(battle.player, pvpRoom.player1Id, 0);
-    const player2Pet = BattleConverter.ToFightPetInfo(battle.enemy, pvpRoom.player2Id, 0);
-
-    Logger.Debug(
-      `[BattleManager] 发送NOTE_START_FIGHT给玩家1: ` +
-      `player1Pet(userId=${player1Pet.userID}, petId=${player1Pet.petID}, name=${player1Pet.petName}), ` +
-      `player2Pet(userId=${player2Pet.userID}, petId=${player2Pet.petID}, name=${player2Pet.petName})`
-    );
-
-    Logger.Debug(
-      `[BattleManager] 发送NOTE_START_FIGHT给玩家2: ` +
-      `player2Pet(userId=${player2Pet.userID}, petId=${player2Pet.petID}, name=${player2Pet.petName}), ` +
-      `player1Pet(userId=${player1Pet.userID}, petId=${player1Pet.petID}, name=${player1Pet.petName})`
-    );
-
-    await player1Session.Player.SendPacket(new PacketNoteStartFight(0, player1Pet, player2Pet));
-    await player2Session.Player.SendPacket(new PacketNoteStartFight(0, player2Pet, player1Pet));
-
-    Logger.Info(
-      `[BattleManager] PVP战斗开始: player1=${pvpRoom.player1Id}, player2=${pvpRoom.player2Id}`
-    );
-  }
-
-  /**
-   * 创建PVP战斗实例
-   */
-  private async CreatePvpBattle(
-    player1: PlayerInstance,
-    player2: PlayerInstance
-  ): Promise<IBattleInfo | null> {
-    try {
-      const player1Pets = player1.PetManager.PetData.GetPetsInBag();
-      const player2Pets = player2.PetManager.PetData.GetPetsInBag();
-
-      const player1HealthyPets = player1Pets.filter(p => p.hp > 0);
-      const player2HealthyPets = player2Pets.filter(p => p.hp > 0);
-
-      if (player1HealthyPets.length === 0 || player2HealthyPets.length === 0) {
-        Logger.Warn(`[BattleManager] PVP战斗创建失败：有玩家没有健康精灵`);
-        return null;
-      }
-
-      const player1Pet = player1HealthyPets.find(p => p.isDefault) || player1HealthyPets[0];
-      const player2Pet = player2HealthyPets.find(p => p.isDefault) || player2HealthyPets[0];
-
-      const player1PetConfig = GameConfig.GetPetById(player1Pet.petId);
-      const player2PetConfig = GameConfig.GetPetById(player2Pet.petId);
-
-      if (!player1PetConfig || !player2PetConfig) {
-        Logger.Warn(`[BattleManager] PVP战斗创建失败：找不到精灵配置`);
-        return null;
-      }
-
-      const player1BattlePet = this._initService['BuildBattlePet'](
-        player1Pet.petId,
-        player1Pet.nick || player1PetConfig.DefName || 'Pet',
-        player1Pet.level, player1Pet.hp, player1Pet.maxHp,
-        player1Pet.atk, player1Pet.def, player1Pet.spAtk, player1Pet.spDef, player1Pet.speed,
-        player1PetConfig.Type || 0,
-        player1Pet.skillArray.filter((s: number) => s > 0).length > 0 ? player1Pet.skillArray.filter((s: number) => s > 0) : [10001],
-        player1Pet.catchTime, 0
-      );
-
-      const player2BattlePet = this._initService['BuildBattlePet'](
-        player2Pet.petId,
-        player2Pet.nick || player2PetConfig.DefName || 'Pet',
-        player2Pet.level, player2Pet.hp, player2Pet.maxHp,
-        player2Pet.atk, player2Pet.def, player2Pet.spAtk, player2Pet.spDef, player2Pet.speed,
-        player2PetConfig.Type || 0,
-        player2Pet.skillArray.filter((s: number) => s > 0).length > 0 ? player2Pet.skillArray.filter((s: number) => s > 0) : [10001],
-        player2Pet.catchTime, 0
-      );
-
-      const battle: IBattleInfo = {
-        userId: player1.Uid,
-        player: player1BattlePet,
-        enemy: player2BattlePet,
-        turn: 0,
-        isOver: false,
-        isPvp: true,
-        player2Id: player2.Uid,
-        startTime: Date.now()
-      };
-
-      return battle;
-    } catch (error) {
-      Logger.Error(`[BattleManager] 创建PVP战斗失败`, error as Error);
-      return null;
-    }
   }
 
   // ==================== 技能使用 ====================
@@ -805,19 +942,25 @@ export class BattleManager extends BaseManager {
     }
 
     if (this._currentBattle.isPvp === true) {
-      await this.HandlePvpUseSkill(skillId);
+      await this._pvpService.HandleUseSkill(skillId);
       return;
     }
 
     // PvE战斗
     this.DeductSkillPP(this._currentBattle.player, skillId);
     const currentTurn = this._currentBattle.turn;
+    await this.EmitRoundStartEvent(currentTurn + 1);
+    const statusBefore = this.CaptureStatusSnapshot();
 
     const result = this._turnService.ExecuteTurn(this._currentBattle, skillId);
     const { firstAttack, secondAttack } = this.BuildAttackValuePair(result, this.UserID, 0);
 
     await this.Player.SendPacket(new PacketNoteUseSkill(firstAttack, secondAttack));
     this.UpdatePlayerHPRecord();
+    await this.EmitAttackResultEvents(result);
+    await this.EmitStatusChangeEvents(statusBefore);
+    await this.EmitPetDeadEventsIfNeeded();
+    await this.EmitRoundEndEvent(this._currentBattle.turn, result.isOver, result.winner);
 
     if (await this.CheckPlayerPetDeath()) return;
 
@@ -826,202 +969,6 @@ export class BattleManager extends BaseManager {
     }
 
     Logger.Info(`[BattleManager] 使用技能: UserID=${this.UserID}, SkillId=${skillId}, Turn=${currentTurn}`);
-  }
-
-  /**
-   * 处理PVP战斗中的技能使用
-   */
-  private async HandlePvpUseSkill(skillId: number): Promise<void> {
-    if (!this._currentBattle || !this._currentBattle.player2Id) {
-      Logger.Error(`[BattleManager] PVP战斗数据异常`);
-      return;
-    }
-
-    const isPlayer1 = this.UserID === this._currentBattle.userId;
-    const myPet = isPlayer1 ? this._currentBattle.player : this._currentBattle.enemy;
-
-    this.DeductSkillPP(myPet, skillId);
-
-    const action: IPvpAction = { type: 'skill', skillId };
-    const bothReady = PvpBattleManager.Instance.SetPlayerAction(this.UserID, action);
-
-    if (!bothReady) {
-      Logger.Info(`[BattleManager] PVP等待对手提交动作: UserID=${this.UserID}, SkillId=${skillId}`);
-      return;
-    }
-
-    await this.ResolvePvpTurn();
-  }
-
-  /**
-   * PVP回合结算
-   */
-  private async ResolvePvpTurn(): Promise<void> {
-    if (!this._currentBattle || !this._currentBattle.player2Id) return;
-
-    const actions = PvpBattleManager.Instance.GetActions(this.UserID);
-    if (!actions) {
-      Logger.Error(`[BattleManager] ResolvePvpTurn: 获取动作失败`);
-      return;
-    }
-
-    const { player1Action, player2Action, player1Id, player2Id } = actions;
-
-    const player1Session = OnlineTracker.Instance.GetPlayerSession(player1Id);
-    const player2Session = OnlineTracker.Instance.GetPlayerSession(player2Id);
-
-    const player1ChangePet = player1Action.type === 'changePet';
-    const player2ChangePet = player2Action.type === 'changePet';
-
-    // 处理换精灵动作（在结算前执行）
-    if (player1ChangePet && player1Action.catchTime) {
-      await this.ExecutePvpChangePet(player1Id, player1Action.catchTime, true);
-    }
-    if (player2ChangePet && player2Action.catchTime) {
-      await this.ExecutePvpChangePet(player2Id, player2Action.catchTime, false);
-    }
-
-    // 如果双方都换精灵，不执行技能回合，直接结束
-    if (player1ChangePet && player2ChangePet) {
-      Logger.Info(`[BattleManager] PVP双方都换精灵，跳过技能回合`);
-      PvpBattleManager.Instance.ClearActions(this.UserID);
-      return;
-    }
-
-    // 确定双方的技能ID（换精灵的一方技能ID为0）
-    const player1SkillId = player1ChangePet ? 0 : (player1Action.skillId || 0);
-    const player2SkillId = player2ChangePet ? 0 : (player2Action.skillId || 0);
-
-    Logger.Info(
-      `[BattleManager] PVP回合结算: player1(${player1Id}) ` +
-      `action=${player1ChangePet ? 'changePet' : 'skill'} skill=${player1SkillId}, ` +
-      `player2(${player2Id}) action=${player2ChangePet ? 'changePet' : 'skill'} skill=${player2SkillId}`
-    );
-
-    // 执行PVP回合（传入pet2SkillId）
-    const result = this._turnService.ExecuteTurn(this._currentBattle, player1SkillId, player2SkillId);
-
-    // 构建攻击结果并发送给双方
-    const { firstAttack, secondAttack } = this.BuildAttackValuePair(result, player1Id, player2Id);
-
-    if (player1Session?.Player) {
-      await player1Session.Player.SendPacket(new PacketNoteUseSkill(firstAttack, secondAttack));
-    }
-    if (player2Session?.Player) {
-      await player2Session.Player.SendPacket(new PacketNoteUseSkill(firstAttack, secondAttack));
-    }
-
-    // 更新HP记录
-    if (player1Session?.Player) {
-      player1Session.Player.BattleManager._battlePetHPMap.set(
-        this._currentBattle.player.catchTime, this._currentBattle.player.hp
-      );
-    }
-    if (player2Session?.Player) {
-      player2Session.Player.BattleManager._battlePetHPMap.set(
-        this._currentBattle.enemy.catchTime, this._currentBattle.enemy.hp
-      );
-    }
-
-    PvpBattleManager.Instance.ClearActions(this.UserID);
-
-    const p1Hp = this._currentBattle.player.hp;
-    const p2Hp = this._currentBattle.enemy.hp;
-
-    await this.CheckPvpBattleEnd(result, player1Id, player2Id);
-
-    Logger.Info(
-      `[BattleManager] PVP回合结算完成: player1HP=${p1Hp}, player2HP=${p2Hp}, isOver=${result.isOver}`
-    );
-  }
-
-  /**
-   * 执行PVP换精灵
-   */
-  private async ExecutePvpChangePet(userId: number, catchTime: number, isPlayer1: boolean): Promise<void> {
-    if (!this._currentBattle) return;
-
-    const session = OnlineTracker.Instance.GetPlayerSession(userId);
-    if (!session?.Player) return;
-
-    const playerPets = session.Player.PetManager.PetData.GetPetsInBag();
-    const newPet = playerPets.find(p => p.catchTime === catchTime);
-    if (!newPet) return;
-
-    const petConfig = GameConfig.GetPetById(newPet.petId);
-    if (!petConfig) return;
-
-    const battlePet = isPlayer1 ? this._currentBattle.player : this._currentBattle.enemy;
-
-    // 保存旧精灵的HP
-    const oldCatchTime = battlePet.catchTime;
-    const battleManager = session.Player.BattleManager;
-    battleManager._battlePetHPMap.set(oldCatchTime, battlePet.hp);
-
-    this.UpdateBattlePet(battlePet, newPet, petConfig);
-    battleManager._battlePetHPMap.set(newPet.catchTime, battlePet.hp);
-
-    // 发送换精灵通知给双方
-    const opponentId = isPlayer1 ? this._currentBattle.player2Id! : this._currentBattle.userId;
-    const opponentSession = OnlineTracker.Instance.GetPlayerSession(opponentId);
-
-    await session.Player.SendPacket(new PacketChangePet(
-      userId, newPet.petId,
-      newPet.nick || petConfig.DefName || 'Pet',
-      newPet.level, battlePet.hp, battlePet.maxHp, newPet.catchTime
-    ));
-
-    if (opponentSession?.Player) {
-      await opponentSession.Player.SendPacket(new PacketChangePet(
-        userId, newPet.petId,
-        newPet.nick || petConfig.DefName || 'Pet',
-        newPet.level, battlePet.hp, battlePet.maxHp, newPet.catchTime
-      ));
-    }
-
-    Logger.Info(`[BattleManager] PVP换精灵: userId=${userId}, newPetId=${newPet.petId}, isPlayer1=${isPlayer1}`);
-  }
-
-  /**
-   * 检查PVP战斗结束条件
-   */
-  private async CheckPvpBattleEnd(
-    result: { isOver: boolean; winner?: number; reason?: number },
-    player1Id: number,
-    player2Id: number
-  ): Promise<void> {
-    if (!this._currentBattle) return;
-
-    const player1Session = OnlineTracker.Instance.GetPlayerSession(player1Id);
-    const player2Session = OnlineTracker.Instance.GetPlayerSession(player2Id);
-
-    if (this._currentBattle.player.hp <= 0) {
-      const p1Pets = player1Session?.Player?.PetManager.PetData.GetPetsInBag();
-      const p1HasHealthy = p1Pets?.some(p => p.hp > 0 && p.catchTime !== this._currentBattle!.player.catchTime);
-
-      if (!p1HasHealthy) {
-        this._currentBattle.isOver = true;
-        await this.HandleFightOver(player2Id, 0);
-        return;
-      }
-      Logger.Info(`[BattleManager] PVP玩家1精灵阵亡，等待切换`);
-    }
-
-    if (this._currentBattle.enemy.hp <= 0) {
-      const p2Pets = player2Session?.Player?.PetManager.PetData.GetPetsInBag();
-      const p2HasHealthy = p2Pets?.some(p => p.hp > 0 && p.catchTime !== this._currentBattle!.enemy.catchTime);
-
-      if (!p2HasHealthy) {
-        this._currentBattle.isOver = true;
-        await this.HandleFightOver(player1Id, 0);
-        return;
-      }
-      Logger.Info(`[BattleManager] PVP玩家2精灵阵亡，等待切换`);
-    }
-
-    if (result.isOver) {
-      await this.HandleFightOver(result.winner || 0, result.reason || 0);
-    }
   }
 
   // ==================== 战斗结束 ====================
@@ -1058,7 +1005,7 @@ export class BattleManager extends BaseManager {
 
     // PVP通知对手
     if (isPvp) {
-      await this.NotifyPvpOpponentFightOver(reason, winnerId);
+      await this._pvpService.NotifyOpponentFightOver(reason, winnerId);
     }
 
     // PVE清理地图
@@ -1073,6 +1020,23 @@ export class BattleManager extends BaseManager {
         Logger.Info(`[BattleManager] 推送物品奖励弹窗: RewardItems=${rewardItems.length}`);
       }, 1200);
     }
+
+    // 派发战斗结束事件（在 CleanupBattle 之前，确保数据可用）
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.BATTLE_END,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      battleType: this.GetBattleTypeForEvent(this._currentBattle),
+      mapId: this._currentBattleMapId,
+      isVictory: winnerId === this.UserID,
+      playerPetId: this._currentBattle.player.petId,
+      enemyPetId: this._currentBattle.enemy.petId,
+      rounds: this._currentBattle.roundCount || 0,
+      extra: {
+        sptId: this._currentBattle.enemy.id,
+        dropItems: rewardItems.map(r => ({ itemId: r.itemId, count: r.itemCnt })),
+      },
+    } as IBattleEndEvent);
 
     this.CleanupBattle();
 
@@ -1127,19 +1091,13 @@ export class BattleManager extends BaseManager {
 
       // PVP模式：换精灵作为回合动作
       if (isPvp) {
-        const action: IPvpAction = { type: 'changePet', catchTime };
-        const bothReady = PvpBattleManager.Instance.SetPlayerAction(this.UserID, action);
-
-        if (!bothReady) {
-          Logger.Info(`[BattleManager] PVP换精灵，等待对手: UserID=${this.UserID}, CatchTime=${catchTime}`);
-          return;
-        }
-
-        await this.ResolvePvpTurn();
+        await this._pvpService.HandleChangePetAction(catchTime);
         return;
       }
 
       // PVE模式：立即执行
+      const oldPetId = this._currentBattle.player.petId;
+      const oldCatchTime = this._currentBattle.player.catchTime;
       this.UpdateBattlePet(this._currentBattle.player, newPet, petConfig);
       this._battlePetHPMap.set(newPet.catchTime, this._currentBattle.player.hp);
 
@@ -1152,6 +1110,15 @@ export class BattleManager extends BaseManager {
         this._currentBattle.player.maxHp,
         newPet.catchTime
       ));
+      await this.Player.EventBus.Emit({
+        type: BattleEventType.PET_SWITCH,
+        timestamp: Date.now(),
+        playerId: this.UserID,
+        oldPetId,
+        oldCatchTime,
+        newPetId: this._currentBattle.player.petId,
+        newCatchTime: this._currentBattle.player.catchTime,
+      } as IPetSwitchEvent);
 
       Logger.Info(
         `[BattleManager] 更换精灵: UserID=${this.UserID}, PetId=${newPet.petId}, ` +
@@ -1172,14 +1139,23 @@ export class BattleManager extends BaseManager {
   /**
    * 处理捕捉精灵
    * CMD 2409: CATCH_MONSTER
+   * @param capsuleID 胶囊物品ID
    */
-  public async HandleCatchMonster(): Promise<void> {
+  public async HandleCatchMonster(capsuleID: number = 300001): Promise<void> {
     if (!this._currentBattle || this._currentBattle.isOver) {
       await this.Player.SendPacket(new PacketEmpty(CommandID.CATCH_MONSTER).setResult(5001));
       return;
     }
 
-    const catchResult = this._turnService.Catch(this._currentBattle);
+    const catchResult = this._turnService.Catch(this._currentBattle, capsuleID);
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.CATCH_RESULT,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      targetPetId: this._currentBattle.enemy.id,
+      success: catchResult.success,
+      capsuleId: capsuleID,
+    } as ICatchResultEvent);
 
     if (catchResult.success) {
       const success = await this._rewardService.ProcessCatch(
@@ -1226,6 +1202,7 @@ export class BattleManager extends BaseManager {
       // 检查是否被打败
       if (this._currentBattle.player.hp <= 0) {
         this._currentBattle.isOver = true;
+        await this.EmitPetDeadEventsIfNeeded();
         await this.HandleFightOver(0, 0);
       }
 
@@ -1248,6 +1225,13 @@ export class BattleManager extends BaseManager {
     await this.SyncBattlePetHP();
 
     await this.Player.SendPacket(new PacketEscapeFight(1));
+    await this.Player.EventBus.Emit({
+      type: BattleEventType.ESCAPE_RESULT,
+      timestamp: Date.now(),
+      playerId: this.UserID,
+      success: true,
+      reason: 'player_escape',
+    } as IEscapeResultEvent);
 
     // 发送战斗结束包 (reason=1 表示逃跑)
     await this.SendFightOverPacket(this.Player, 1, 0);
@@ -1274,26 +1258,7 @@ export class BattleManager extends BaseManager {
 
     // 如果是PVP战斗，通知对手战斗结束（对手获胜）
     if (this._currentBattle.isPvp === true && this._currentBattle.player2Id) {
-      const opponentId = this.UserID === this._currentBattle.userId
-        ? this._currentBattle.player2Id
-        : this._currentBattle.userId;
-
-      Logger.Info(`[BattleManager] PVP战斗中玩家掉线，通知对手: opponentId=${opponentId}`);
-
-      const opponentSession = OnlineTracker.Instance.GetPlayerSession(opponentId);
-      if (opponentSession?.Player) {
-        // 对手获胜（reason=1 表示对方中途退出）
-        await this.SendFightOverPacket(opponentSession.Player, 1, opponentId);
-        await opponentSession.Player.BattleManager.SyncBattlePetHP();
-        opponentSession.Player.BattleManager.CleanupBattle();
-      }
-
-      // 清理PVP房间
-      const roomKey = PvpBattleManager.Instance['GetRoomKey'](
-        this._currentBattle.userId,
-        this._currentBattle.player2Id
-      );
-      PvpBattleManager.Instance.RemoveBattleRoom(roomKey);
+      await this._pvpService.OnLogout();
     }
 
     // 清理本地战斗数据
@@ -1304,7 +1269,7 @@ export class BattleManager extends BaseManager {
    * 构建玩家背包中所有精灵的SimplePetInfoProto数组
    */
   public BuildPlayerPetsInfo(): SimplePetInfoProto[] {
-    return this.Player.PetManager.PetData.GetPetsInBag().map(pet => {
+    return this.Player.PetManager.GetPetsInBag().map(pet => {
       const petConfig = GameConfig.GetPetById(pet.petId);
       const skills = pet.skillArray.filter(s => s > 0);
       const finalSkills = skills.length > 0 ? skills : [10001];

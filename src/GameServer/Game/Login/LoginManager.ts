@@ -271,14 +271,14 @@ export class LoginManager {
       Logger.Debug(`[LoginManager] regTime=${proto.regTime} (${new Date(proto.regTime * 1000).toISOString()}), userId=${proto.userId}, nick=${proto.nickname}`);
       
       // 加载任务数据并填充到 Proto
-      proto.taskList = playerInstance.TaskManager.TaskData.GetTaskStatusArray();
-      
-      Logger.Debug(`[LoginManager] 任务数据: 共${playerInstance.TaskManager.TaskData.TaskList.size}个任务`);
+      proto.taskList = playerInstance.TaskManager.GetTaskStatusArray();
+
+      Logger.Debug(`[LoginManager] 任务数据: 共${playerInstance.TaskManager.GetTaskCount()}个任务`);
       
       // 加载精灵数据并填充到 Proto（仅背包精灵）
       // 客户端的 initData() 只接收背包精灵的完整信息
       // 仓库精灵通过 getStorageList() 单独获取（发送 GET_PET_LIST）
-      const bagPets = playerInstance.PetManager.PetData.GetPetsInBag();
+      const bagPets = playerInstance.PetManager.GetPetsInBag();
       
       Logger.Debug(`[LoginManager] 背包精灵数: ${bagPets.length}`);
       
@@ -309,11 +309,7 @@ export class LoginManager {
       }
       
       // 加载服装数据并填充到 Proto
-      const clothList = playerInstance.ItemManager.ItemData.ItemList
-        .filter(item => {
-          // 过滤出服装类物品（ID范围 100000-199999）
-          return item.itemId >= 100000 && item.itemId < 200000;
-        })
+      const clothList = playerInstance.ItemManager.GetClothItems()
         .map(item => ({
           id: item.itemId,
           level: 0  // 服装没有等级概念，默认为0

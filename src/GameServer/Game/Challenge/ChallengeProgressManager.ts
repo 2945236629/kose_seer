@@ -4,6 +4,9 @@ import { Logger } from '../../../shared/utils/Logger';
 import { BossAbilityConfig } from '../Battle/BossAbility/BossAbilityConfig';
 import { ChallengeProgressData } from '../../../DataBase/models/ChallengeProgressData';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
+import { PuniConfig, IPuniSeal } from '../../../shared/config/game/PuniConfig';
+import { GameEventBus } from '../Event/GameEventBus';
+import { BattleEventType, IBattleEndEvent } from '../Event/EventTypes';
 
 /**
  * 挑战进度管理器
@@ -24,6 +27,31 @@ export class ChallengeProgressManager extends BaseManager {
 
   constructor(player: PlayerInstance) {
     super(player);
+  }
+
+  // ==================== 事件注册 ====================
+
+  /**
+   * 注册事件监听
+   * - 监听战斗结束事件，处理谱尼封印和SPT BOSS进度
+   */
+  public RegisterEvents(eventBus: GameEventBus): void {
+    eventBus.On<IBattleEndEvent>(BattleEventType.BATTLE_END, this.OnBattleEnd.bind(this), 50);
+  }
+
+  /**
+   * 战斗结束事件处理
+   */
+  private OnBattleEnd(event: IBattleEndEvent): void {
+    if (!event.isVictory) return;
+
+    // 谱尼封印挑战
+    if (event.extra.puniDoorIndex) {
+      this.OnPuniBattleVictory(event.extra.puniDoorIndex);
+    }
+
+    // 注意：SPT BOSS 击败标记已在 BattleRewardService.ProcessSPTFirstDefeatReward 中处理
+    // 事件处理器不再重复标记，避免双重调用
   }
 
   /**
@@ -255,6 +283,30 @@ export class ChallengeProgressManager extends BaseManager {
       this.SetPuniLevel(targetLevel);
       Logger.Info(`[ChallengeProgressManager] 谱尼战胜利: Door=${door}, Level ${currentLevel} -> ${targetLevel}`);
     }
+  }
+
+  // ==================== 谱尼封印配置查询 ====================
+
+  /**
+   * 获取谱尼封印配置
+   * @param door 封印门号（1-8）
+   */
+  public GetPuniSealConfig(door: number): IPuniSeal | undefined {
+    return PuniConfig.Instance.GetSeal(door);
+  }
+
+  /**
+   * 获取所有谱尼封印配置
+   */
+  public GetAllPuniSeals(): IPuniSeal[] {
+    return PuniConfig.Instance.GetAllSeals();
+  }
+
+  /**
+   * 获取谱尼封印数量
+   */
+  public GetPuniSealCount(): number {
+    return PuniConfig.Instance.GetSealCount();
   }
 
   // ==================== 勇者之塔挑战进度 ====================

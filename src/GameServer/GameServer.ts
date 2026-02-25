@@ -191,7 +191,7 @@ export class GameServer {
 
     // 3. 加载任务配置
     Logger.Info('[GameServer] 加载任务配置...');
-    const { TaskConfig } = await import('./Game/Task/TaskConfig');
+    const { TaskConfig } = await import('../shared/config/game/TaskConfig');
     TaskConfig.Instance.Load();
 
     // 4. 启动自动保存任务（每5分钟）

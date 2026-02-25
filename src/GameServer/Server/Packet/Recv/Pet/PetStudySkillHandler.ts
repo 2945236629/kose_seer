@@ -14,18 +14,6 @@ export class PetStudySkillHandler implements IHandler {
     if (!player) return;
 
     const req = PetStudySkillReqProto.fromBuffer(body);
-    
-    // 找到要替换的技能在技能槽中的位置
-    const pet = player.PetManager.PetData.GetPetByCatchTime(req.catchTime);
-    if (!pet) {
-      return;
-    }
-    
-    const slotIndex = pet.skillArray.indexOf(req.dropSkillId);
-    if (slotIndex === -1) {
-      return;
-    }
-    
-    await player.PetManager.HandleStudySkill(req.catchTime, req.studySkillId, slotIndex);
+    await player.PetManager.HandleStudySkill(req.catchTime, req.studySkillId, req.dropSkillId);
   }
 }

@@ -13,18 +13,20 @@ import { MailManager } from '../Mail/MailManager';
 import { FriendManager } from '../Friend/FriendManager';
 import { TaskManager } from '../Task/TaskManager';
 import { ChallengeProgressManager } from '../Challenge/ChallengeProgressManager';
+import { GachaManager } from '../Gacha/GachaManager';
 import { PlayerRepository } from '../../../DataBase/repositories/Player/PlayerRepository';
 import { PlayerData } from '../../../DataBase/models/PlayerData';
 import { DatabaseHelper } from '../../../DataBase/DatabaseHelper';
-import { PvpBattleManager } from '../Battle/PvpBattleManager';
+import { GameEventBus } from '../Event/GameEventBus';
+import { PlayerEventType, IPlayerLoginEvent, IPlayerLogoutEvent } from '../Event/EventTypes';
 
 /**
  * 玩家实例
- * 管理单个玩家的所有数据和Manager
- * 
+ * 管理单个玩家的所有数据和 Manager
+ *
  * 架构原则：
  * - 每个在线玩家对应一个 PlayerInstance
- * - 包含各种 Manager（ItemManager、MapManager、PetManager等）
+ * - 包含各种 Manager（ItemManager、MapManager、PetManager 等）
  * - 提供 SendPacket 方法用于发送数据包
  * - Manager 随 Player 实例自动创建和销毁
  * - 通过 Data 属性直接访问玩家数据
@@ -36,12 +38,12 @@ export class PlayerInstance {
   private _session: IClientSession;
   private _packetBuilder: PacketBuilder;
   private _playerRepo: PlayerRepository; // 仅用于初始化加载
-  
-  public Uid: number;  // 用户ID
-  public Initialized: boolean = false;  // 是否已初始化
 
-  // ===== 数据对象=====
-  public Data!: PlayerData;  // 玩家数据
+  public Uid: number; // 用户ID
+  public Initialized: boolean = false; // 是否已初始化
+
+  // ===== 数据对象 =====
+  public Data!: PlayerData; // 玩家数据
 
   // ===== Managers =====
   public ItemManager: ItemManager;
@@ -55,6 +57,8 @@ export class PlayerInstance {
   public FriendManager: FriendManager;
   public TaskManager: TaskManager;
   public ChallengeProgressManager: ChallengeProgressManager;
+  public GachaManager: GachaManager;
+  public EventBus: GameEventBus;
 
   constructor(session: IClientSession, userID: number, packetBuilder: PacketBuilder) {
     this._session = session;
@@ -74,10 +78,32 @@ export class PlayerInstance {
     this.FriendManager = new FriendManager(this);
     this.TaskManager = new TaskManager(this);
     this.ChallengeProgressManager = new ChallengeProgressManager(this);
+    this.GachaManager = new GachaManager(this);
+    this.EventBus = new GameEventBus();
+    this.RegisterAllEvents();
   }
 
   /**
-   * 获取Session
+   * 让每个 Manager 注册自己关心的事件
+   * 各 Manager 在 RegisterEvents() 中自行注册，PlayerInstance 不关心具体事件
+   */
+  private RegisterAllEvents(): void {
+    this.ItemManager.RegisterEvents(this.EventBus);
+    this.MapManager.RegisterEvents(this.EventBus);
+    this.MapSpawnManager.RegisterEvents(this.EventBus);
+    this.PetManager.RegisterEvents(this.EventBus);
+    this.SystemManager.RegisterEvents(this.EventBus);
+    this.NoNoManager.RegisterEvents(this.EventBus);
+    this.BattleManager.RegisterEvents(this.EventBus);
+    this.MailManager.RegisterEvents(this.EventBus);
+    this.FriendManager.RegisterEvents(this.EventBus);
+    this.TaskManager.RegisterEvents(this.EventBus);
+    this.ChallengeProgressManager.RegisterEvents(this.EventBus);
+    this.GachaManager.RegisterEvents(this.EventBus);
+  }
+
+  /**
+   * 获取 Session
    */
   public get Session(): IClientSession {
     return this._session;
@@ -92,16 +118,18 @@ export class PlayerInstance {
       const cmdId = proto.getCmdId();
       const result = proto.getResult();
       const bodyData = proto.serialize();
-      
+
       const packet = this._packetBuilder.Build(
         cmdId,
         this.Uid,
         result,
         bodyData
       );
-      
+
       this._session.Socket.write(packet);
-      Logger.Info(`[Player ${this.Uid}] 发送数据包: cmdId=${cmdId}, result=${result}, bodyLen=${bodyData.length}, packetLen=${packet.length}`);
+      Logger.Info(
+        `[Player ${this.Uid}] 发送数据包: cmdId=${cmdId}, result=${result}, bodyLen=${bodyData.length}, packetLen=${packet.length}`
+      );
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       Logger.Error(`[Player ${this.Uid}] 发送数据包失败`, error);
@@ -113,12 +141,19 @@ export class PlayerInstance {
    */
   public async OnLogin(): Promise<void> {
     Logger.Info(`[Player ${this.Uid}] 玩家登录: ${this.Data.nick}`);
-    
-    // 注意：不在这里调用NoNoManager.OnLogin()
+
+    // 注意：不在这里调用 NoNoManager.OnLogin()
     // 原因：
-    // 1. 如果玩家有NoNo，客户端会根据登录响应中的hasNono字段主动请求NoNo信息或召唤
-    // 2. 如果玩家没有NoNo，不需要任何处理
-    // 3. 服务器不应该主动推送NoNo信息
+    // 1. 如果玩家有 NoNo，客户端会根据登录响应中的 hasNono 字段主动请求 NoNo 信息或召唤
+    // 2. 如果玩家没有 NoNo，不需要任何处理
+    // 3. 服务器不应该主动推送 NoNo 信息
+
+    // 派发登录事件
+    await this.EventBus.Emit({
+      type: PlayerEventType.LOGIN,
+      timestamp: Date.now(),
+      playerId: this.Uid,
+    } as IPlayerLoginEvent);
   }
 
   /**
@@ -126,22 +161,23 @@ export class PlayerInstance {
    */
   public async OnLogout(): Promise<void> {
     Logger.Info(`[Player ${this.Uid}] 玩家登出: ${this.Data.nick}`);
-    
-    // 广播玩家离开地图（必须在保存数据前执行，因为需要知道玩家在哪个地图）
-    await this.MapManager.HandleLeaveMap();
-    
+
+    // 在清理前先派发登出事件，让各 Manager 自行处理退出逻辑
+    await this.EventBus.Emit({
+      type: PlayerEventType.LOGOUT,
+      timestamp: Date.now(),
+      playerId: this.Uid,
+    } as IPlayerLogoutEvent);
+
     // 实时保存该玩家的所有数据
     await DatabaseHelper.Instance.SaveUser(this.Uid);
-    
-    // 清理 BattleManager
-    await this.BattleManager.OnLogout();
-    
-    // 清理 PVP 邀请
-    PvpBattleManager.Instance.OnPlayerLogout(this.Uid);
-    
-    // 清理Session中的Player引用
+
+    // 清理 Session 中的 Player 引用
     this._session.Player = undefined;
-    
+
+    // 销毁事件总线
+    this.EventBus.Destroy();
+
     // 移除缓存
     DatabaseHelper.Instance.RemoveCache(this.Uid);
   }
@@ -152,9 +188,9 @@ export class PlayerInstance {
   public async Initialize(): Promise<void> {
     // 加载玩家数据（通过 DatabaseHelper）
     this.Data = await DatabaseHelper.Instance.GetInstanceOrCreateNew_PlayerData(this.Uid);
-    
+
     Logger.Info(`[PlayerInstance] 玩家数据已加载 userId=${this.Uid}, nickname=${this.Data.nick}`);
-    
+
     // 初始化所有 Manager（加载各自的 Data）
     await this.ItemManager.Initialize();
     await this.PetManager.Initialize();
@@ -163,10 +199,11 @@ export class PlayerInstance {
     await this.TaskManager.Initialize();
     await this.NoNoManager.Initialize();
     await this.ChallengeProgressManager.Initialize();
-    
+    await this.GachaManager.Initialize();
+
     // 同步服装数据：从 ItemData 提取服装物品到 PlayerData.clothes
     this.syncClothesData();
-    
+
     this.Initialized = true;
   }
 
@@ -174,18 +211,18 @@ export class PlayerInstance {
    * 同步服装数据：从 ItemData 提取服装物品到 PlayerData.clothes
    */
   private syncClothesData(): void {
-    // 从 ItemData 中筛选出服装类物品（ID >= 100000）
-    const clothItems = this.ItemManager.ItemData.ItemList.filter(item => item.itemId >= 100000);
-    
+    // 从 ItemManager 中筛选出服装类物品
+    const clothItems = this.ItemManager.GetClothItems();
+
     // 转换为 clothes 格式
     this.Data.clothes = clothItems.map(item => ({
       id: item.itemId,
-      level: 0,  // 服装没有等级概念，默认为0
+      level: 0, // 服装没有等级概念，默认为0
       count: item.count
     }));
-    
+
     this.Data.clothCount = this.Data.clothes.length;
-    
+
     Logger.Debug(`[PlayerInstance] 同步服装数据: UserID=${this.Uid}, 服装数量=${this.Data.clothCount}`);
   }
 

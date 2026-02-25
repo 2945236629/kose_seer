@@ -96,8 +96,7 @@ export class FriendManager extends BaseManager {
       // 如果目标玩家在线，更新内存数据
       const targetSession = OnlineTracker.Instance.GetPlayerSession(targetUid);
       if (targetSession?.Player?.FriendManager) {
-        // 内存中的数据会自动同步到数据库
-        targetSession.Player.FriendManager.FriendData.ReceiveApplyList.push(this.UserID);
+        targetSession.Player.FriendManager.ReceiveFriendApply(this.UserID);
       }
 
       Logger.Info(`[FriendManager] 发送好友申请: ${this.UserID} -> ${targetUid}`);
@@ -158,12 +157,8 @@ export class FriendManager extends BaseManager {
       // 如果目标玩家在线，更新内存数据
       const targetSession = OnlineTracker.Instance.GetPlayerSession(targetUid);
       if (targetSession?.Player?.FriendManager) {
-        // 内存中的数据会自动同步到数据库
-        const idx = targetSession.Player.FriendManager.FriendData.SendApplyList.indexOf(this.UserID);
-        if (idx > -1) {
-          targetSession.Player.FriendManager.FriendData.SendApplyList.splice(idx, 1);
-        }
-        targetSession.Player.FriendManager.FriendData.FriendList.push(this.UserID);
+        targetSession.Player.FriendManager.RemoveSentApply(this.UserID);
+        targetSession.Player.FriendManager.AddFriendEntry(this.UserID);
       }
 
       Logger.Info(`[FriendManager] 接受好友申请: ${this.UserID} <- ${targetUid}`);
@@ -201,10 +196,7 @@ export class FriendManager extends BaseManager {
       // 如果目标玩家在线，更新内存数据
       const targetSession = OnlineTracker.Instance.GetPlayerSession(targetUid);
       if (targetSession?.Player?.FriendManager) {
-        const idx = targetSession.Player.FriendManager.FriendData.SendApplyList.indexOf(this.UserID);
-        if (idx > -1) {
-          targetSession.Player.FriendManager.FriendData.SendApplyList.splice(idx, 1);
-        }
+        targetSession.Player.FriendManager.RemoveSentApply(this.UserID);
       }
 
       Logger.Info(`[FriendManager] 拒绝好友申请: ${this.UserID} <- ${targetUid}`);
@@ -241,10 +233,7 @@ export class FriendManager extends BaseManager {
       // 如果目标玩家在线，更新内存数据
       const targetSession = OnlineTracker.Instance.GetPlayerSession(targetUid);
       if (targetSession?.Player?.FriendManager) {
-        const idx = targetSession.Player.FriendManager.FriendData.FriendList.indexOf(this.UserID);
-        if (idx > -1) {
-          targetSession.Player.FriendManager.FriendData.FriendList.splice(idx, 1);
-        }
+        targetSession.Player.FriendManager.RemoveFriendEntry(this.UserID);
       }
 
       Logger.Info(`[FriendManager] 删除好友: ${this.UserID} -> ${targetUid}`);
@@ -390,6 +379,62 @@ export class FriendManager extends BaseManager {
       Logger.Error(`[FriendManager] HandleSeeOnline failed`, error as Error);
     }
   }
+
+  // ==================== 公开 API（供跨玩家操作使用） ====================
+
+  /**
+   * 接收好友申请（由其他玩家的 FriendManager 调用）
+   */
+  public ReceiveFriendApply(fromUid: number): void {
+    if (!this.FriendData.ReceiveApplyList.includes(fromUid)) {
+      this.FriendData.ReceiveApplyList.push(fromUid);
+    }
+  }
+
+  /**
+   * 移除已发送的好友申请（对方确认/拒绝后调用）
+   */
+  public RemoveSentApply(targetUid: number): void {
+    const idx = this.FriendData.SendApplyList.indexOf(targetUid);
+    if (idx > -1) {
+      this.FriendData.SendApplyList.splice(idx, 1);
+    }
+  }
+
+  /**
+   * 被添加为好友（对方确认申请后调用）
+   */
+  public AddFriendEntry(friendUid: number): void {
+    if (!this.FriendData.FriendList.includes(friendUid)) {
+      this.FriendData.FriendList.push(friendUid);
+    }
+  }
+
+  /**
+   * 被删除好友（对方删除好友后调用）
+   */
+  public RemoveFriendEntry(friendUid: number): void {
+    const idx = this.FriendData.FriendList.indexOf(friendUid);
+    if (idx > -1) {
+      this.FriendData.FriendList.splice(idx, 1);
+    }
+  }
+
+  /**
+   * 获取好友列表（只读）
+   */
+  public GetFriendList(): number[] {
+    return this.FriendData.FriendList;
+  }
+
+  /**
+   * 获取黑名单列表（只读）
+   */
+  public GetBlackList(): number[] {
+    return this.FriendData.BlackList;
+  }
+
+  // ==================== 业务方法 ====================
 
   /**
    * 登出清理

@@ -253,21 +253,19 @@ export class BattleTurnService {
   }
 
   /**
-   * 处理捕获
-   *
-   * 捕获成功率计算：
-   * - 基于目标HP比例
-   * - 异常状态增加捕获率
-   * - 精灵球类型影响捕获率
-   * - 等级越高越难捕获
+   * 尝试捕获精灵
+   * @param battle 战斗信息
+   * @param capsuleID 胶囊物品ID (300001=普通, 300002=中级, 300003=高级, 300004=超级, 300005+=大师球)
    */
-  public Catch(battle: IBattleInfo, ballType: PokeBallType = PokeBallType.NORMAL): {
+  public Catch(battle: IBattleInfo, capsuleID: number = 300001): {
     success: boolean;
     catchTime: number;
     catchRate: number;
     shakeCount: number;
   } {
-    // 检查是否可以捕获
+    // 胶囊ID转精灵球类型
+    const ballType = this.GetPokeBallType(capsuleID);
+
     const isBoss = battle.battleType === 'BOSS';
     const canCapture = BattleCaptureSystem.CanCapture(battle.enemy, isBoss);
 
@@ -338,5 +336,25 @@ export class BattleTurnService {
    */
   public CleanupBattle(battleId: number): void {
     this.escapeAttempts.delete(battleId);
+  }
+
+  /**
+   * 将胶囊物品ID转换为精灵球类型
+   * 300001=普通, 300002=中级, 300003=高级, 300004=超级, 300005+=大师球
+   */
+  private GetPokeBallType(capsuleID: number): PokeBallType {
+    switch (capsuleID) {
+      case 300001:
+        return PokeBallType.NORMAL;
+      case 300002:
+        return PokeBallType.INTERMEDIATE;
+      case 300003:
+        return PokeBallType.ADVANCED;
+      case 300004:
+        return PokeBallType.SUPER;
+      default:
+        // 300005及以上的都视为大师球
+        return PokeBallType.MASTER;
+    }
   }
 }

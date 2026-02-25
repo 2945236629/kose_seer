@@ -28,7 +28,7 @@ export class AcceptDailyTaskHandler implements IHandler {
       Logger.Info(`[AcceptDailyTaskHandler] 用户 ${player.Uid} 接受每日任务 ${taskId}`);
 
       // 检查是否已接受
-      if (player.TaskManager.TaskData.IsTaskAccepted(taskId)) {
+      if (player.TaskManager.IsTaskAccepted(taskId)) {
         Logger.Warn(`[AcceptDailyTaskHandler] 每日任务 ${taskId} 已接受`);
         await player.SendPacket(new PacketAcceptDailyTask(5002));
         return;

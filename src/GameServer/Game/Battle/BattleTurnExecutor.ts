@@ -431,9 +431,6 @@ export class BattleTurnExecutor {
           }
 
           // 伤害计算
-          BattleCore.DebugBattleLv(attacker, `${attacker.name}(攻击方)`);
-          BattleCore.DebugBattleLv(defender, `${defender.name}(防御方)`);
-
           const damageResult = BattleCore.CalculateDamage(attacker, defender, skill, isCrit, skillPower);
           damage = Math.floor(damageResult.damage * weakenMultiplier);
 
